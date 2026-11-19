@@ -1,6 +1,10 @@
 """Local QA CONNECT proxy for Android emulators without working DNS."""
+import base64
+import http.client
 import select
 import socket
+from urllib.parse import unquote, urlsplit
+from urllib.request import getproxies, proxy_bypass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOSTS = {
@@ -11,15 +15,36 @@ HOSTS = {
 }
 
 
+def connect_upstream(host):
+    proxy = getproxies().get('https')
+    if not proxy or proxy_bypass(host):
+        return socket.create_connection((host, 443), timeout=15)
+
+    location = urlsplit(proxy)
+    if location.scheme != 'http' or not location.hostname:
+        raise OSError('Expected an HTTP upstream proxy')
+    connection = http.client.HTTPConnection(location.hostname, location.port or 80, timeout=15)
+    headers = {}
+    if location.username is not None:
+        user = unquote(location.username)
+        password = unquote(location.password or '')
+        token = base64.b64encode(f'{user}:{password}'.encode()).decode('ascii')
+        headers['Proxy-Authorization'] = f'Basic {token}'
+    connection.set_tunnel(host, 443, headers=headers)
+    connection.connect()
+    upstream, connection.sock = connection.sock, None
+    return upstream
+
+
 class ConnectHandler(BaseHTTPRequestHandler):
     def do_CONNECT(self):
-        if self.path.rpartition(':')[::2] not in {(host, '443') for host in HOSTS}:
+        host, _, port = self.path.rpartition(':')
+        if host not in HOSTS or port != '443':
             self.send_error(403)
             return
-        host = self.path.rsplit(':', 1)[0]
         try:
-            upstream = socket.create_connection((host, 443), timeout=15)
-        except OSError:
+            upstream = connect_upstream(host)
+        except (OSError, http.client.HTTPException):
             self.send_error(502)
             return
         with upstream:
