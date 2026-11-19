@@ -21,6 +21,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.activity:activity:1.10.1")
     implementation("androidx.core:core:1.16.0")
     implementation("androidx.core:core-splashscreen:1.0.1")
 }
