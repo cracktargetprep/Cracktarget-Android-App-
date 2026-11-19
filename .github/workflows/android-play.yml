@@ -7,6 +7,7 @@ on:
     paths:
       - 'app/**'
       - 'tools/android-smoke.sh'
+      - 'tools/android-listing-proxy.py'
       - '.github/workflows/android-play.yml'
       - 'settings.gradle.kts'
       - 'gradle.properties'
@@ -67,6 +68,7 @@ jobs:
           CT_TEST_APK: app/build/outputs/apk/playQa/app-playQa.apk
           CT_CAPTURE_PLAY_LISTING: '1'
         run: bash tools/android-smoke.sh
+      - 'tools/android-listing-proxy.py'
       - name: Upload Play emulator evidence
         if: always()
         uses: actions/upload-artifact@v4

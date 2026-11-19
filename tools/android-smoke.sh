@@ -20,9 +20,14 @@ printf 'no\n' | avdmanager create avd --force --name "$avd_name" --path "$ANDROI
 "$emulator" -list-avds | grep -Fx "$avd_name"
 "$adb_bin" start-server
 "$emulator" -avd "$avd_name" -no-window -no-audio -no-snapshot -no-boot-anim -no-metrics \
-    -gpu swiftshader_indirect -dns-server 8.8.8.8,1.1.1.1 -port 5554 > "$out/emulator.log" 2>&1 &
+    -gpu swiftshader_indirect -port 5554 > "$out/emulator.log" 2>&1 &
 emulator_pid=$!
-trap 'adb_device logcat -d > "$out/adb.log" 2>/dev/null || true; kill "$emulator_pid" 2>/dev/null || true' EXIT
+cleanup() {
+    adb_device logcat -d > "$out/adb.log" 2>/dev/null || true
+    kill "$emulator_pid" 2>/dev/null || true
+    if [[ -n "${listing_proxy_pid:-}" ]]; then kill "$listing_proxy_pid" 2>/dev/null || true; fi
+}
+trap cleanup EXIT
 
 for _ in {1..90}; do
     if "$adb_bin" -s "$serial" get-state 2>/dev/null | grep -Fxq device; then break; fi
@@ -43,8 +48,12 @@ adb_device install "$apk"
 if [[ "${CT_CAPTURE_PLAY_LISTING:-0}" == 1 ]]; then
     mkdir -p "$out/listing"
     adb_device shell wm size 1080x1920
-    curl --fail --silent --show-error --max-time 20 -o /dev/null https://cracktarget.com/
-    adb_device shell ping -c 1 -W 2 cracktarget.com > "$out/listing-network.txt" 2>&1 || true
+    python3 tools/android-listing-proxy.py > "$out/listing-network.txt" 2>&1 &
+    listing_proxy_pid=$!
+    curl --fail --silent --show-error --retry 3 --retry-connrefused --max-time 20 \
+        --proxy http://127.0.0.1:18888 -o /dev/null https://cracktarget.com/
+    adb_device reverse tcp:18888 tcp:18888
+    adb_device shell settings put global http_proxy 127.0.0.1:18888
     adb_device shell am force-stop "$app"
     adb_device shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "$app/.MainActivity"
 
@@ -94,6 +103,8 @@ PYTHON
     capture "Tests" "03-mock-tests" 'Free Mock Tests 2026|Exam-Wise Online Practice|UPPCS 2026 Mock Test'
     capture "Account" "04-account" 'Aspirant Dashboard|Sign in to your account|woocommerce-form-login'
     grep -Fq 'text="Delete account"' "$out/listing-view.xml"
+    adb_device shell settings put global http_proxy :0
+    adb_device reverse --remove tcp:18888
     adb_device shell wm size reset
 fi
 
