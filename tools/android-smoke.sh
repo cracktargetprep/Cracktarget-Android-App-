@@ -7,23 +7,36 @@ app=com.cracktarget.app
 apk=app/build/outputs/apk/debug/app-debug.apk
 serial=emulator-5554
 out="$RUNNER_TEMP/cracktarget-smoke"
-mkdir -p "$out"
+avd_name=cracktarget_qa
+export ANDROID_USER_HOME="$RUNNER_TEMP/cracktarget-android"
+export ANDROID_AVD_HOME="$RUNNER_TEMP/cracktarget-avd"
+unset ANDROID_SDK_HOME
+mkdir -p "$out" "$ANDROID_USER_HOME" "$ANDROID_AVD_HOME"
 
-adb_device() { "$adb_bin" -s "$serial" "$@"; }
+adb_device() { timeout 35 "$adb_bin" -s "$serial" "$@"; }
 
-printf 'no\n' | avdmanager create avd --force --name CrackTargetQA --package 'system-images;android-36;google_apis;x86_64'
+printf 'no\n' | avdmanager create avd --force --name "$avd_name" --path "$ANDROID_AVD_HOME/$avd_name.avd" \
+    --package 'system-images;android-36;google_apis;x86_64' --device pixel_6
+"$emulator" -list-avds | grep -Fx "$avd_name"
 "$adb_bin" start-server
-"$emulator" -avd CrackTargetQA -no-window -no-audio -no-snapshot -no-boot-anim -no-metrics \
+"$emulator" -avd "$avd_name" -no-window -no-audio -no-snapshot -no-boot-anim -no-metrics \
     -gpu swiftshader_indirect -port 5554 > "$out/emulator.log" 2>&1 &
 emulator_pid=$!
 trap 'adb_device logcat -d > "$out/adb.log" 2>/dev/null || true; kill "$emulator_pid" 2>/dev/null || true' EXIT
 
-timeout 180 "$adb_bin" -s "$serial" wait-for-device
+for _ in {1..90}; do
+    if "$adb_bin" -s "$serial" get-state 2>/dev/null | grep -Fxq device; then break; fi
+    if ! kill -0 "$emulator_pid" 2>/dev/null; then cat "$out/emulator.log"; exit 1; fi
+    sleep 2
+done
+"$adb_bin" -s "$serial" get-state
 for _ in {1..80}; do
     if [[ "$(adb_device shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; then break; fi
     sleep 2
 done
 [[ "$(adb_device shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]
+adb_device shell settings put global device_provisioned 1
+adb_device shell settings put secure user_setup_complete 1
 adb_device shell input keyevent 82
 adb_device shell wm size > "$out/display.txt"
 adb_device install "$apk"
