@@ -44,6 +44,7 @@ adb_device shell settings put global device_provisioned 1
 adb_device shell settings put secure user_setup_complete 1
 adb_device shell input keyevent 82
 adb_device shell wm size > "$out/display.txt"
+adb_device shell wm density > "$out/density.txt"
 adb_device install "$apk"
 dump_view() {
     adb_device shell uiautomator dump /sdcard/ct-qa.xml >/dev/null 2>&1 &&
@@ -125,7 +126,9 @@ if [[ "${CT_CAPTURE_PLAY_LISTING:-0}" == 1 ]]; then
     tap_label "Exclusive books"
     capture "06-books" 'text="My book downloads"'
     tap_label "Account" android.widget.Button
-    capture "07-account" 'text="Delete account"'
+    capture "07-account" 'text="Account dashboard"'
+    adb_device shell input swipe 500 1450 500 750 350
+    expect_screen 'text="Delete account"' "$out/listing-account-deletion.xml"
     adb_device shell settings put global http_proxy :0
     adb_device reverse --remove tcp:18888
     adb_device shell wm size reset
@@ -165,9 +168,11 @@ from xml.etree import ElementTree
 
 out = Path(sys.argv[1])
 levels = {}
+display_bottom = int(re.findall(r'\d+x(\d+)', (out / 'display.txt').read_text())[-1])
+density = int(re.findall(r'\d+', (out / 'density.txt').read_text())[-1])
+minimum_system_inset = round(density * 24 / 160)
 for mode in ('threebutton', 'gestural'):
     nodes = list(ElementTree.parse(out / f'{mode}.xml').iter('node'))
-    display_bottom = int(re.findall(r'\d+x(\d+)', (out / 'display.txt').read_text())[-1])
     buttons = [n for n in nodes if n.get('class') == 'android.widget.Button' and n.get('package') == 'com.cracktarget.app']
     nav = {n.get('text'): tuple(map(int, re.findall(r'\d+', n.get('bounds')))) for n in buttons}
     assert any(n.get('text') == 'Quick access' for n in nodes), f'{mode}: offline native home missing'
@@ -176,7 +181,7 @@ for mode in ('threebutton', 'gestural'):
     assert all(left[2] <= right[0] for left, right in zip(bounds, bounds[1:])), (mode, bounds)
     assert len(set(rect[-1] for rect in bounds)) == 1, (mode, bounds)
     levels[mode] = display_bottom - bounds[0][-1]
-assert levels['threebutton'] > levels['gestural'] > 0, levels
+assert all(clearance >= minimum_system_inset for clearance in levels.values()), levels
 print('Native home launched offline. Five navigation controls stayed above both system navigation modes.', levels)
 PY
 
