@@ -45,6 +45,46 @@ adb_device shell settings put secure user_setup_complete 1
 adb_device shell input keyevent 82
 adb_device shell wm size > "$out/display.txt"
 adb_device install "$apk"
+dump_view() {
+    adb_device shell uiautomator dump /sdcard/ct-qa.xml >/dev/null 2>&1 &&
+        adb_device pull /sdcard/ct-qa.xml "$1" >/dev/null
+}
+
+tap_label() {
+    local label=$1 class=${2:-}
+    local center
+    dump_view "$out/tap.xml"
+    center=$(python3 - "$out/tap.xml" "$label" "$class" <<'PYTHON'
+from xml.etree import ElementTree
+import re
+import sys
+
+xml, label, widget = sys.argv[1:]
+for node in ElementTree.parse(xml).iter("node"):
+    if node.get("package") != "com.cracktarget.app" or (widget and node.get("class") != widget):
+        continue
+    if node.get("text") == label or (node.get("content-desc") or "").startswith(label + ","):
+        left, top, right, bottom = map(int, re.findall(r"\d+", node.get("bounds")))
+        print((left + right) // 2, (top + bottom) // 2)
+        break
+else:
+    raise SystemExit(f"Missing tap target: {label}")
+PYTHON
+)
+    read -r x y <<< "$center"
+    adb_device shell input tap "$x" "$y"
+}
+
+expect_screen() {
+    local marker=$1 destination=$2
+    for _ in {1..12}; do
+        if dump_view "$destination" && grep -iqE "$marker" "$destination"; then return 0; fi
+        sleep 2
+    done
+    echo "Screen marker not found: $marker" >&2
+    return 1
+}
+
 if [[ "${CT_CAPTURE_PLAY_LISTING:-0}" == 1 ]]; then
     mkdir -p "$out/listing"
     adb_device shell wm size 1080x1920
@@ -58,51 +98,34 @@ if [[ "${CT_CAPTURE_PLAY_LISTING:-0}" == 1 ]]; then
     adb_device shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "$app/.MainActivity"
 
     capture() {
-        local label=$1 filename=$2 marker=$3
-        for _ in {1..10}; do
-            if [[ -n "$label" ]] && adb_device shell uiautomator dump /sdcard/ct-listing.xml >/dev/null 2>&1; then
-                adb_device pull /sdcard/ct-listing.xml "$out/listing-view.xml" >/dev/null
-                local center
-                center=$(python3 - "$out/listing-view.xml" "$label" <<'PYTHON'
-from xml.etree import ElementTree
-import re
-import sys
-
-xml, label = sys.argv[1:]
-for node in ElementTree.parse(xml).iter("node"):
-    if node.get("text") == label and node.get("class") == "android.widget.Button" and node.get("package") == "com.cracktarget.app":
-        left, top, right, bottom = map(int, re.findall(r"\d+", node.get("bounds")))
-        print((left + right) // 2, (top + bottom) // 2)
-        break
-PYTHON
-)
-                if [[ -n "$center" ]]; then
-                    adb_device shell input tap $center
-                    label=""
-                fi
-            fi
-            if adb_device shell uiautomator dump /sdcard/ct-listing.xml >/dev/null 2>&1; then
-                adb_device pull /sdcard/ct-listing.xml "$out/listing-view.xml" >/dev/null
-                if grep -iqE "$marker" "$out/listing-view.xml" &&
-                   grep -Fq 'class="android.webkit.WebView"' "$out/listing-view.xml" &&
-                   ! grep -Fq 'text="Retry"' "$out/listing-view.xml" &&
-                   ! grep -iqE 'text="(Checkout|Add to cart|Buy now)"' "$out/listing-view.xml"; then
-                    adb_device exec-out screencap -p > "$out/listing/$filename.png"
-                    return 0
-                fi
-            fi
-            sleep 3
-        done
-        adb_device exec-out screencap -p > "$out/unverified-$filename.png"
-        echo "Online listing screenshot could not be verified: $filename" >&2
-        return 1
+        local filename=$1 marker=$2
+        expect_screen "$marker" "$out/listing-$filename.xml"
+        if grep -iqE 'text="(Checkout|Add to cart|Buy now)"' "$out/listing-$filename.xml"; then
+            echo "Unexpected commerce element in Play edition: $filename" >&2
+            return 1
+        fi
+        adb_device exec-out screencap -p > "$out/listing/$filename.png"
     }
 
-    capture "" "01-home" 'Ultimate Exam Prep|Choose a mock test|CrackTarget.*Exam Prep'
-    capture "Study" "02-study" 'Study Directory.*Exams|Study Directory.*Subjects|Explore by Subject'
-    capture "Tests" "03-mock-tests" 'Free Mock Tests 2026|Exam-Wise Online Practice|UPPCS 2026 Mock Test'
-    capture "Account" "04-account" 'Aspirant Dashboard|Sign in to your account|woocommerce-form-login'
-    grep -Fq 'text="Delete account"' "$out/listing-view.xml"
+    capture "01-home" 'text="Quick access"'
+    tap_label "Study" android.widget.Button
+    capture "02-study" 'text="All free study material"'
+    tap_label "Tests" android.widget.Button
+    capture "03-mock-tests" 'text="Free practice"'
+    tap_label "Updates" android.widget.Button
+    expect_screen 'text="Exam updates"' "$out/updates.xml"
+    tap_label "Current affairs"
+    capture "04-current-affairs" 'text="Latest daily edition"'
+    tap_label "Updates" android.widget.Button
+    expect_screen 'text="Exam updates"' "$out/updates.xml"
+    tap_label "Vacancy notices"
+    capture "05-vacancies" 'text="Railway Recruitment Boards|text="Uttar Pradesh Public Service Commission|text="Union Public Service Commission|text="Export-Import Bank|text="Staff Selection Commission'
+    tap_label "Home" android.widget.Button
+    expect_screen 'text="Quick access"' "$out/home.xml"
+    tap_label "Exclusive books"
+    capture "06-books" 'text="My book downloads"'
+    tap_label "Account" android.widget.Button
+    capture "07-account" 'text="Delete account"'
     adb_device shell settings put global http_proxy :0
     adb_device reverse --remove tcp:18888
     adb_device shell wm size reset
@@ -123,7 +146,7 @@ for mode in threebutton gestural; do
     for _ in {1..10}; do
         if adb_device shell uiautomator dump /sdcard/ct-qa.xml >/dev/null 2>&1; then
             adb_device pull /sdcard/ct-qa.xml "$out/$mode.xml" >/dev/null
-            if grep -Fq 'text="Retry"' "$out/$mode.xml"; then break; fi
+            if grep -Fq 'text="Quick access"' "$out/$mode.xml"; then break; fi
         fi
         sleep 2
     done
@@ -147,12 +170,21 @@ for mode in ('threebutton', 'gestural'):
     display_bottom = int(re.findall(r'\d+x(\d+)', (out / 'display.txt').read_text())[-1])
     buttons = [n for n in nodes if n.get('class') == 'android.widget.Button' and n.get('package') == 'com.cracktarget.app']
     nav = {n.get('text'): tuple(map(int, re.findall(r'\d+', n.get('bounds')))) for n in buttons}
-    assert 'Retry' in nav, f'{mode}: offline Retry missing'
-    bounds = [nav[label] for label in ('Home', 'Study', 'Tests', 'Affairs', 'Account')]
+    assert any(n.get('text') == 'Quick access' for n in nodes), f'{mode}: offline native home missing'
+    bounds = [nav[label] for label in ('Home', 'Study', 'Tests', 'Updates', 'Account')]
     assert all(x0 < x1 and y0 < y1 < display_bottom for x0, y0, x1, y1 in bounds), (mode, bounds, display_bottom)
     assert all(left[2] <= right[0] for left, right in zip(bounds, bounds[1:])), (mode, bounds)
     assert len(set(rect[-1] for rect in bounds)) == 1, (mode, bounds)
     levels[mode] = display_bottom - bounds[0][-1]
 assert levels['threebutton'] > levels['gestural'] > 0, levels
-print('Installed and launched. Five navigation controls stayed above both system navigation modes. Offline Retry was present.', levels)
+print('Native home launched offline. Five navigation controls stayed above both system navigation modes.', levels)
 PY
+
+
+tap_label "Study" android.widget.Button
+expect_screen 'text="All free study material"' "$out/offline-study.xml"
+tap_label "All free study material"
+expect_screen 'text="Retry"' "$out/offline-reader.xml"
+adb_device shell input keyevent 4
+expect_screen 'text="Study by exam"' "$out/offline-back.xml"
+echo "The offline reader showed Retry and Android Back returned to the native study screen."

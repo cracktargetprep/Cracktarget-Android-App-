@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -24,6 +26,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.ScrollView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -46,29 +49,36 @@ class MainActivity : ComponentActivity() {
     private lateinit var errorPanel: LinearLayout
     private lateinit var errorMessage: TextView
     private lateinit var googleButton: Button
-    private lateinit var accountActions: LinearLayout
+    private lateinit var toolbar: FrameLayout
+    private lateinit var nativePrep: NativePrep
+    private var nativeContent: ScrollView? = null
+    private var screen = PrepScreen.HOME
+    private var reading = false
+    private var resetReaderHistory = false
+    private var readerTitle = ""
+    private val readerScript by lazy { assets.open("reader-shell.js").bufferedReader().use { it.readText() } }
     private var playFilterReady = false
     private lateinit var browserSignIn: BrowserSignIn
     private lateinit var downloads: Downloads
     private val handler = Handler(Looper.getMainLooper())
     private val slowPage = Runnable { if (loading) showError(R.string.page_slow, false) }
-    private val destinations = listOf(
-        R.string.home to SITE,
-        R.string.study to "${SITE}study-directory/",
-        R.string.tests to "${SITE}mocktest/",
-        R.string.affairs to "${SITE}current-affairs/",
-        R.string.account to ACCOUNT,
-    )
-    private val navButtons = mutableListOf<TextView>()
+    private val tabs = listOf(PrepScreen.HOME, PrepScreen.STUDY, PrepScreen.TESTS, PrepScreen.UPDATES, PrepScreen.ACCOUNT)
+    private val navButtons = mutableListOf<Button>()
     private var uploadCallback: ValueCallback<Array<Uri>>? = null
     private var latestUrl = SITE
     private var loading = false
     private var mainFrameError = false
     private var signingIn = false
     private val historyBack = object : OnBackPressedCallback(false) {
-        override fun handleOnBackPressed() { web.goBack() }
+        override fun handleOnBackPressed() {
+            when {
+                reading && !resetReaderHistory && web.canGoBack() -> web.goBack()
+                reading -> showNative(screen)
+                screen != screen.tab -> showNative(screen.tab)
+                else -> showNative(PrepScreen.HOME)
+            }
+        }
     }
-    private val navy = Color.rgb(16, 37, 68)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -77,8 +87,10 @@ class MainActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this, historyBack)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(NativePrep.surface)
         }
+        toolbar = FrameLayout(this)
+        root.addView(toolbar, LinearLayout.LayoutParams(-1, -2))
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 100
             progressTintList = ColorStateList.valueOf(Color.rgb(36, 119, 88))
@@ -96,22 +108,6 @@ class MainActivity : ComponentActivity() {
         root.addView(googleButton, LinearLayout.LayoutParams(-1, -2).apply {
             setMargins(dp(12), dp(3), dp(12), dp(3))
         })
-        accountActions = LinearLayout(this).apply {
-            visibility = View.GONE
-            gravity = Gravity.END
-            listOf(
-                R.string.privacy_policy to PlayWebPolicy.privacyUrl,
-                R.string.delete_account to PlayWebPolicy.deletionUrl,
-            ).forEach { (label, url) ->
-                addView(Button(this@MainActivity, null, android.R.attr.borderlessButtonStyle).apply {
-                    setText(label)
-                    isAllCaps = false
-                    minHeight = dp(48)
-                    setOnClickListener { load(url) }
-                })
-            }
-        }
-        root.addView(accountActions, LinearLayout.LayoutParams(-1, -2))
         page = FrameLayout(this)
         root.addView(page, LinearLayout.LayoutParams(-1, 0, 1f))
         errorPanel = LinearLayout(this).apply {
@@ -121,7 +117,7 @@ class MainActivity : ComponentActivity() {
             setPadding(dp(20), dp(12), dp(20), dp(12))
             setBackgroundColor(Color.WHITE)
             errorMessage = TextView(this@MainActivity).apply {
-                setTextColor(navy)
+                setTextColor(NativePrep.ink)
                 textSize = 16f
                 gravity = Gravity.CENTER
                 accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -136,27 +132,32 @@ class MainActivity : ComponentActivity() {
         page.addView(errorPanel, FrameLayout.LayoutParams(-1, -1))
         val nav = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(navy)
-            minimumHeight = dp(52)
+            setBackgroundColor(Color.WHITE)
+            minimumHeight = dp(60)
         }
-        for ((label, url) in destinations) {
+        for (tab in tabs) {
             val button = Button(this, null, android.R.attr.borderlessButtonStyle).apply {
-                setText(label)
+                text = tab.label
                 isAllCaps = false
                 textSize = 12f
                 gravity = Gravity.CENTER
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 minWidth = 0
                 minimumWidth = 0
-                setPadding(dp(2), dp(4), dp(2), dp(4))
-                minHeight = dp(52)
-                setTextColor(ColorStateList(
-                    arrayOf(intArrayOf(android.R.attr.state_selected), intArrayOf()),
-                    intArrayOf(Color.rgb(181, 244, 212), Color.WHITE),
-                ))
-                setOnClickListener { load(url) }
+                minHeight = dp(55)
+                minimumHeight = dp(55)
+                stateListAnimator = null
+                setPadding(dp(2), dp(7), dp(2), dp(7))
+                compoundDrawablePadding = dp(4)
+                setOnClickListener { showNative(tab) }
             }
             navButtons.add(button)
-            nav.addView(button, LinearLayout.LayoutParams(0, -2, 1f))
+            nav.addView(button, LinearLayout.LayoutParams(0, -2, 1f).apply {
+                marginStart = dp(3)
+                marginEnd = dp(3)
+                topMargin = dp(3)
+                bottomMargin = dp(3)
+            })
         }
         root.addView(nav, LinearLayout.LayoutParams(-1, -2))
         bindInsets(root, nav)
@@ -167,22 +168,117 @@ class MainActivity : ComponentActivity() {
             signingIn = active
             googleButton.isEnabled = !active
             showProgress()
-        }) { load(ACCOUNT, force = true) }
+        }) {
+            showNative(PrepScreen.ACCOUNT)
+            openReader(PrepLink("Account dashboard", "", ACCOUNT))
+        }
+        nativePrep = NativePrep(this, ::showNative, ::openReader, { browserSignIn.start() }) { url ->
+            if (PrepCatalog.official(url)) openExternal(Uri.parse(url))
+        }
         CookieManager.getInstance().setAcceptCookie(true)
         createWebView()
-        val restored = if (!BuildConfig.PLAY_DISTRIBUTION || playFilterReady) {
-            savedInstanceState?.getBundle("web")?.let(web::restoreState)
-        } else null
-        if (restored?.currentItem != null) {
-            latestUrl = restored.currentItem?.url?.takeIf { Uri.parse(it).isSite() && playPageAllowed(it) } ?: SITE
-            updateNavigation(latestUrl)
-            historyBack.isEnabled = web.canGoBack()
-            showProgress()
-        } else {
-            if (intent?.action != Intent.ACTION_VIEW) load(SITE)
+
+        val savedScreen = savedInstanceState?.getString("nativeScreen")?.let { value ->
+            PrepScreen.entries.firstOrNull { it.name == value }
+        } ?: PrepScreen.HOME
+        showNative(savedScreen)
+        val savedTitle = savedInstanceState?.getString("readerTitle")
+        val savedUrl = savedInstanceState?.getString("readerUrl")
+        if (savedTitle != null && savedUrl != null && PrepCatalog.firstParty(savedUrl) && playPageAllowed(savedUrl)) {
+            enterReader(savedTitle)
+            latestUrl = savedUrl
+            val restored = if (playFilterReady) savedInstanceState?.getBundle("web")?.let(web::restoreState) else null
+            if (restored?.currentItem == null) load(savedUrl, force = true)
         }
         browserSignIn.accept(intent)
-        if (restored?.currentItem == null && intent?.action == Intent.ACTION_VIEW) load(ACCOUNT)
+    }
+
+    private fun showNative(destination: PrepScreen) {
+        if (reading) web.stopLoading()
+        reading = false
+        loading = false
+        resetReaderHistory = false
+        handler.removeCallbacks(slowPage)
+        screen = destination
+        web.visibility = View.GONE
+        errorPanel.visibility = View.GONE
+        googleButton.visibility = View.GONE
+        toolbar.removeAllViews()
+        toolbar.addView(nativePrep.toolbar(screen))
+        nativeContent?.let(page::removeView)
+        nativeContent = nativePrep.content(screen).also {
+            page.addView(it, FrameLayout.LayoutParams(-1, -1))
+        }
+        updateTab()
+        historyBack.isEnabled = screen != PrepScreen.HOME
+        showProgress()
+    }
+
+    private fun enterReader(title: String) {
+        reading = true
+        readerTitle = title
+        resetReaderHistory = true
+        historyBack.isEnabled = true
+        nativeContent?.visibility = View.GONE
+        web.visibility = View.VISIBLE
+        errorPanel.visibility = View.GONE
+        googleButton.visibility = View.GONE
+        toolbar.removeAllViews()
+        toolbar.addView(LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(3), dp(16), dp(3))
+            setBackgroundColor(NativePrep.surface)
+            addView(Button(this@MainActivity, null, android.R.attr.borderlessButtonStyle).apply {
+                contentDescription = "Back to ${screen.label}"
+                minWidth = 0
+                minimumWidth = 0
+                minimumHeight = dp(48)
+                setPadding(dp(12), 0, dp(12), 0)
+                setCompoundDrawablesRelativeWithIntrinsicBounds(
+                    PrepIconDrawable(PrepIcon.BACK, NativePrep.green, dp(23)), null, null, null,
+                )
+                setOnClickListener { showNative(screen) }
+            }, LinearLayout.LayoutParams(dp(49), dp(50)))
+            addView(TextView(this@MainActivity).apply {
+                text = title
+                textSize = 17f
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setTextColor(NativePrep.ink)
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+        })
+        updateTab()
+    }
+
+    private fun openReader(link: PrepLink) {
+        if (!PrepCatalog.firstParty(link.url) || !playPageAllowed(link.url)) {
+            notify(R.string.play_unavailable_link)
+            return
+        }
+        enterReader(link.title)
+        latestUrl = link.url
+        load(link.url, force = true)
+    }
+
+    private fun updateTab() {
+        navButtons.forEachIndexed { index, button ->
+            val selected = tabs[index] == screen.tab
+            val color = if (selected) NativePrep.green else NativePrep.muted
+            button.isSelected = selected
+            button.setTextColor(color)
+            button.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                null, PrepIconDrawable(tabs[index].icon, color, dp(22)), null, null,
+            )
+            button.background = android.graphics.drawable.RippleDrawable(
+                ColorStateList.valueOf(0x22136758),
+                GradientDrawable().apply {
+                    setColor(if (selected) NativePrep.pale else Color.WHITE)
+                    cornerRadius = dp(13).toFloat()
+                },
+                null,
+            )
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -193,7 +289,7 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowCompat.getInsetsController(window, window.decorView).apply {
             isAppearanceLightStatusBars = true
-            isAppearanceLightNavigationBars = false
+            isAppearanceLightNavigationBars = true
         }
     }
 
@@ -218,6 +314,9 @@ class MainActivity : ComponentActivity() {
                 mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 safeBrowsingEnabled = true
                 userAgentString = "$userAgentString $APP_AGENT"
+            }
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                WebViewCompat.addDocumentStartJavaScript(this, readerScript, setOf(PlayWebPolicy.siteOrigin))
             }
             playFilterReady = installPlayFilter(this)
             webViewClient = SiteClient()
@@ -245,6 +344,7 @@ class MainActivity : ComponentActivity() {
                 else notify(R.string.play_unavailable_link)
             }
         }
+        web.visibility = if (reading) View.VISIBLE else View.GONE
         page.addView(web, 0, FrameLayout.LayoutParams(-1, -1))
     }
 
@@ -308,19 +408,14 @@ class MainActivity : ComponentActivity() {
             return true
         }
 
-        override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
-            historyBack.isEnabled = view.canGoBack()
-        }
-
         override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
-            if (url == null) return
+            if (!reading || url == null) return
             if (!Uri.parse(url).isSite() || !playPageAllowed(url)) {
                 view.stopLoading()
                 showError(R.string.page_unavailable)
                 return
             }
             latestUrl = url
-            updateNavigation(url)
             googleButton.visibility = View.GONE
             mainFrameError = false
             loading = true
@@ -332,14 +427,20 @@ class MainActivity : ComponentActivity() {
         }
 
         override fun onPageCommitVisible(view: WebView, url: String) {
-            if (!mainFrameError && url == latestUrl) {
-                errorPanel.visibility = View.GONE
-                handler.removeCallbacks(slowPage)
+            if (!reading || mainFrameError || url != latestUrl) return
+            if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                view.evaluateJavascript(readerScript, null)
             }
+            if (resetReaderHistory) {
+                view.clearHistory()
+                resetReaderHistory = false
+            }
+            errorPanel.visibility = View.GONE
+            handler.removeCallbacks(slowPage)
         }
 
         override fun onPageFinished(view: WebView, url: String?) {
-            if (url != latestUrl) return
+            if (!reading || url != latestUrl) return
             loading = false
             handler.removeCallbacks(slowPage)
             showProgress()
@@ -348,7 +449,7 @@ class MainActivity : ComponentActivity() {
                 view.evaluateJavascript(
                     "Boolean(document.querySelector('form.woocommerce-form-login') && !document.body.classList.contains('logged-in'))",
                 ) { guest ->
-                    if (view === web && url == latestUrl && !mainFrameError) {
+                    if (reading && view === web && url == latestUrl && !mainFrameError) {
                         googleButton.visibility = if (guest == "true") View.VISIBLE else View.GONE
                     }
                 }
@@ -356,35 +457,24 @@ class MainActivity : ComponentActivity() {
         }
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-            if (request.isForMainFrame) showError(R.string.page_unavailable)
+            if (reading && request.isForMainFrame) showError(R.string.page_unavailable)
         }
 
         override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) {
-            if (request.isForMainFrame && response.statusCode >= 500) showError(R.string.page_unavailable)
+            if (reading && request.isForMainFrame && response.statusCode >= 500) showError(R.string.page_unavailable)
         }
 
         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
             page.removeView(view)
             view.destroy()
             createWebView()
-            historyBack.isEnabled = false
-            showError(R.string.page_unavailable)
+            if (reading) showError(R.string.page_unavailable)
             return true
         }
     }
 
-    private fun updateNavigation(url: String) {
-        val path = Uri.parse(url).path.orEmpty().trimEnd('/')
-        accountActions.visibility = if (BuildConfig.PLAY_DISTRIBUTION &&
-            (path == "/my-account" || path.startsWith("/my-account/"))) View.VISIBLE else View.GONE
-        var selected = destinations.indexOfFirst { (_, destination) ->
-            destination != SITE && url.startsWith(destination)
-        }
-        if (selected < 0 && Uri.parse(url).path == "/") selected = 0
-        navButtons.forEachIndexed { index, button -> button.isSelected = index == selected }
-    }
-
     private fun showError(message: Int, failed: Boolean = true) {
+        if (!reading) return
         mainFrameError = failed
         loading = false
         handler.removeCallbacks(slowPage)
@@ -395,7 +485,7 @@ class MainActivity : ComponentActivity() {
 
     private fun showProgress() {
         progress.isIndeterminate = signingIn
-        progress.visibility = if (loading || signingIn) View.VISIBLE else View.INVISIBLE
+        progress.visibility = if ((reading && loading) || signingIn) View.VISIBLE else View.INVISIBLE
     }
 
     private fun load(url: String, force: Boolean = false) {
@@ -438,9 +528,14 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        val webState = Bundle()
-        web.saveState(webState)
-        outState.putBundle("web", webState)
+        outState.putString("nativeScreen", screen.name)
+        if (reading) {
+            val webState = Bundle()
+            web.saveState(webState)
+            outState.putBundle("web", webState)
+            outState.putString("readerTitle", readerTitle)
+            outState.putString("readerUrl", latestUrl)
+        }
         super.onSaveInstanceState(outState)
     }
 
@@ -452,6 +547,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         browserSignIn.destroy()
+        nativePrep.destroy()
         historyBack.isEnabled = false
         uploadCallback?.onReceiveValue(null)
         web.destroy()

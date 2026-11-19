@@ -3,7 +3,7 @@ name: Verify CrackTarget Play candidate
 on:
   workflow_dispatch:
   push:
-    branches: [main, 'codex/play-release']
+    branches: [main, 'codex/play-release', 'codex/native-companion']
     paths:
       - 'app/**'
       - 'tools/android-smoke.sh'
