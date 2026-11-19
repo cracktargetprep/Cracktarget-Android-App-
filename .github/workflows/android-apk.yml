@@ -31,6 +31,14 @@ jobs:
           yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses || true
           "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" "platform-tools"
 
+      - name: Prepare official CrackTarget launcher icon
+        run: |
+          mkdir -p app/src/main/res/drawable
+          curl --fail --location --retry 3 --silent --show-error \
+            "https://cracktarget.com/wp-content/uploads/2026/09/cropped-cracktarget.png" \
+            -o app/src/main/res/drawable/cracktarget_launcher.png
+          file app/src/main/res/drawable/cracktarget_launcher.png
+
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
