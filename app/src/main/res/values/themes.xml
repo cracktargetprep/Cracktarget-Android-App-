@@ -1,0 +1,14 @@
+<resources>
+    <color name="launcher_background">#FFFFFF</color>
+    <style name="Theme.CrackTarget" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:colorAccent">#247758</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#FFFFFF</item>
+    </style>
+    <style name="Theme.CrackTarget.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/launcher_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.CrackTarget</item>
+    </style>
+</resources>

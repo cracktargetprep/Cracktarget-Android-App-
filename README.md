@@ -1,33 +1,27 @@
-# CrackTarget Android — Version 1.1 testing source
+# CrackTarget for Android
 
-**Status:** Android Studio source only. NOT a compiled or tested APK. Existing WordPress/WooCommerce site is the backend. Package `com.cracktarget.app`.
+Android app for [CrackTarget](https://cracktarget.com/), package `com.cracktarget.app`. WordPress, WooCommerce, and the existing test platform handle customer accounts, purchases, test access, and results.
 
-## Build a test APK
-1. Install Android Studio with JDK 17 and Android SDK Platform 35.
-2. Open the `CrackTargetAndroid` folder in Android Studio, and wait for Gradle sync. Internet access is needed to download Gradle dependencies.
-3. Select **Build > Build Bundle(s) / APK(s) > Build APK(s)**.
-4. Install the generated `app-debug.apk` on a test phone. Do **not** upload the debug APK to Play Store.
-5. Run the QA checklist below. Website URL paths are provisional and must be verified on the live site.
+## Build and test
 
-## Real-device QA checklist
-- Home, Study, Tests, Affairs and Account navigation all resolve to correct pages.
-- WooCommerce account login, logout, password reset, and session persistence work.
-- New users and existing purchasers see the correct entitlements; never unlock content based on client-side checks.
-- Each test allows attempts as purchased; countdown, submit, scoring, explanations and persisted result history work after app restart.
-- File upload, ebook download and PDF viewing work; private files stay access-controlled.
-- External payment authentication and return flow work on the device.
-- Offline/no network, back button, external links, rotation and accessibility are tested.
+Use JDK 17, Gradle 8.13, and Android SDK Platform 36 and Build Tools 36.0.0.
 
-## Play Store release checklist
-- Replace simple WebView-first UX with meaningful app-specific functionality; review Play Store minimum functionality rules.
-- Verify Google Play payments policy for digital goods. Do not assume website checkout for in-app digital purchases is allowed; choose a compliant Play Billing design where required.
-- Add brand-owned launcher icon, splash, screenshots, privacy policy, data safety, account deletion pathway and support contact.
-- Confirm package name, Play Console ownership, app signing and release keystore (never commit keystore/passwords).
-- Produce signed Android App Bundle (AAB), conduct internal/closed testing and submit for review.
-- App-specific native mock-test APIs and push notifications are **not yet implemented**.
+```sh
+gradle --no-daemon assembleDebug lintDebug testDebugUnitTest
+php -l wordpress/ct-app-login-bridge/ct-app-login-bridge.php
+python3 wordpress/tests/test_bridge.py
+```
 
-## Security notes
-- No WordPress/WooCommerce API keys or user passwords are embedded in this app.
-- HTTPS-only; unknown non-web schemes are blocked; links outside CrackTarget open externally.
-- Login via existing website cookies, **not** a verified native single-sign-on implementation.
-- Downloads are saved to the app-specific Downloads folder, not public shared Downloads.
+The sideload APK is `app/build/outputs/apk/debug/app-debug.apk`. It is debug-signed. Android only installs an update over an existing APK if the signing certificates match. Use a separate test device to keep existing app-local data intact when certificates differ. Installing another build of the same app on the same device requires removing the previous build first.
+
+## Browser sign-in
+
+The [WordPress bridge](wordpress/ct-app-login-bridge/ct-app-login-bridge.php) works with the existing Site Kit sign-in on WooCommerce My Account. The Android app starts a transaction with a random state and a challenge. Chrome completes the existing login and the user confirms the customer account. The browser offers a package-directed Android intent carrying a short-lived code. Only the initiating Android instance can exchange the code because it keeps the verifier. WordPress creates and verifies a fresh session in Android's WebView cookie store. The WooCommerce account page then renders inside the app.
+
+Package only `wordpress/ct-app-login-bridge/` when uploading the WordPress plugin. The test router stays in the repository. On an in-place update, visit a WordPress admin page to run the idempotent schema setup if the activation hook did not run. The previous app's legacy Google sign-in requires an update to use this bridge. Deactivate the new bridge to disable the new endpoints during incident response. Restore the prior package only if legacy handoff is explicitly required.
+
+## Branding and release
+
+The source image is the [CrackTarget website icon](https://cracktarget.com/wp-content/uploads/2026/09/cropped-cracktarget.png), pinned in `branding/official-site-icon.png`. The compiled resources provide adaptive, round, monochrome, and density-specific variants plus a splash screen.
+
+Before Play submission, verify the paid student journey on a physical device with a designated customer account. Confirm signing ownership, the Play payments approach for digital tests and ebooks, privacy and Data Safety disclosures, account deletion, and Play review access. Keep signing keys and production credentials out of Git.
