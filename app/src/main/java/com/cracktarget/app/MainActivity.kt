@@ -10,10 +10,12 @@ import android.os.Bundle
 import android.os.Environment
 import android.view.Gravity
 import android.view.View
+import android.view.WindowInsets
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -26,42 +28,88 @@ import android.widget.Toast
 class MainActivity : Activity() {
     private lateinit var web: WebView
     private lateinit var progress: ProgressBar
+    private lateinit var offline: LinearLayout
     private var uploadCallback: ValueCallback<Array<Uri>>? = null
     private val uploadRequest = 1001
     private val home = "https://cracktarget.com/"
+    private val account = "https://cracktarget.com/my-account/"
     private val navy = Color.rgb(16, 37, 68)
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density + .5f).toInt()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
-        val header = TextView(this).apply {
-            text = "CrackTarget   |   Learn · Test · Improve"
-            textSize = 17f; setTextColor(Color.WHITE); setBackgroundColor(navy)
-            setPadding(20, 26, 12, 26); gravity = Gravity.CENTER_VERTICAL
+        window.navigationBarColor = Color.rgb(12, 28, 46)
+        window.statusBarColor = navy
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.WHITE)
+            fitsSystemWindows = false
         }
-        root.addView(header, LinearLayout.LayoutParams(-1, -2))
+        // Target SDK 35 is edge-to-edge. Keep native navigation ABOVE the Android
+        // gesture/navigation area, including on devices using 3-button navigation.
+        root.setOnApplyWindowInsetsListener { view, insets ->
+            val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 100 }
-        root.addView(progress, LinearLayout.LayoutParams(-1, 5))
+        root.addView(progress, LinearLayout.LayoutParams(-1, dp(3)))
         web = WebView(this)
         root.addView(web, LinearLayout.LayoutParams(-1, 0, 1f))
-        val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setBackgroundColor(navy) }
+
+        offline = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(20), dp(12), dp(20), dp(12))
+            visibility = View.GONE
+            val message = TextView(this@MainActivity).apply {
+                text = "Could not load this page. Check your connection and try again."
+                setTextColor(navy); textSize = 14f; gravity = Gravity.CENTER
+            }
+            addView(message, LinearLayout.LayoutParams(-1, -2))
+            addView(Button(this@MainActivity).apply {
+                text = "Retry"; isAllCaps = false
+                setOnClickListener { visibility = View.GONE; web.reload() }
+            }, LinearLayout.LayoutParams(-2, dp(48)))
+        }
+        root.addView(offline, LinearLayout.LayoutParams(-1, -2))
+
+        val nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setBackgroundColor(navy)
+            gravity = Gravity.CENTER_VERTICAL
+        }
         val destinations = listOf(
             "Home" to home,
             "Study" to "https://cracktarget.com/study-directory/",
             "Tests" to "https://cracktarget.com/mocktest/",
             "Affairs" to "https://cracktarget.com/current-affairs/",
-            "Account" to "https://cracktarget.com/my-account/"
+            "Account" to account
         )
         for ((label, url) in destinations) {
-            val button = Button(this).apply {
-                text = label; textSize = 11f; isAllCaps = false
-                setTextColor(Color.WHITE); setBackgroundColor(navy)
-                setOnClickListener { web.loadUrl(url) }
+            val button = TextView(this).apply {
+                text = label
+                textSize = 12f
+                gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    if (label == "Account") {
+                        // Google OAuth must NOT run in an embedded WebView. Open the
+                        // existing authenticated browser session for account access.
+                        openInBrowser(account)
+                    } else {
+                        offline.visibility = View.GONE
+                        web.loadUrl(url)
+                    }
+                }
             }
-            nav.addView(button, LinearLayout.LayoutParams(0, -2, 1f))
+            nav.addView(button, LinearLayout.LayoutParams(0, dp(56), 1f))
         }
-        root.addView(nav, LinearLayout.LayoutParams(-1, -2))
+        root.addView(nav, LinearLayout.LayoutParams(-1, dp(56)))
         setContentView(root)
+        root.requestApplyInsets()
 
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true)
@@ -77,13 +125,26 @@ class MainActivity : Activity() {
         }
         WebView.setWebContentsDebuggingEnabled(false)
         web.webViewClient = object : WebViewClient() {
+            override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+                offline.visibility = View.GONE
+            }
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                if (request.isForMainFrame) offline.visibility = View.VISIBLE
+            }
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url
                 val scheme = uri.scheme?.lowercase()
-                if (scheme == "https" && (uri.host == "cracktarget.com" || uri.host == "www.cracktarget.com")) return false
+                val host = uri.host?.lowercase()
+                // Keep WooCommerce's authenticated browser session consistent for
+                // Google sign-in. Never attempt to copy Google or WooCommerce cookies.
+                if (scheme == "https" && (host == "cracktarget.com" || host == "www.cracktarget.com")) {
+                    if (uri.path?.startsWith("/my-account") == true) {
+                        openInBrowser(uri.toString()); return true
+                    }
+                    return false
+                }
                 if (scheme == "https" || scheme == "mailto" || scheme == "tel" || scheme == "intent") {
-                    try { startActivity(Intent(Intent.ACTION_VIEW, uri)) }
-                    catch (_: Exception) { Toast.makeText(this@MainActivity, "No app can open this link", Toast.LENGTH_SHORT).show() }
+                    openInBrowser(uri.toString())
                 }
                 return true
             }
@@ -100,7 +161,7 @@ class MainActivity : Activity() {
                 catch (_: Exception) { uploadCallback = null; false }
             }
         }
-        web.setDownloadListener(DownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
+        web.setDownloadListener(DownloadListener { url, userAgent, _, mimeType, _ ->
             try {
                 val uri = Uri.parse(url)
                 if (uri.scheme != "https") throw IllegalArgumentException("HTTPS required")
@@ -118,6 +179,10 @@ class MainActivity : Activity() {
         if (savedInstanceState == null) web.loadUrl(home) else web.restoreState(savedInstanceState)
     }
 
+    private fun openInBrowser(url: String) {
+        try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+        catch (_: Exception) { Toast.makeText(this, "Browser unavailable", Toast.LENGTH_SHORT).show() }
+    }
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == uploadRequest) {
