@@ -215,7 +215,7 @@ class MainActivity : Activity() {
             webViewClient = SiteClient()
             webChromeClient = object : WebChromeClient() {
                 override fun onProgressChanged(view: WebView, newProgress: Int) {
-                    if (!signingIn) progress.progress = newProgress
+                    if (!signingIn) this@MainActivity.progress.progress = newProgress
                 }
 
                 override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
