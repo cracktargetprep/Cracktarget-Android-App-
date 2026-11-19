@@ -16,4 +16,8 @@
     <string name="download_ready">Download complete.</string>
     <string name="download_failed">The download could not finish. Check your connection and account access.</string>
     <string name="download_no_viewer">Download complete. Install an app that can open this file type.</string>
+    <string name="delete_account">Delete account</string>
+    <string name="privacy_policy">Privacy policy</string>
+    <string name="play_unavailable_link">This link is unavailable in the Google Play edition.</string>
+    <string name="play_webview_update">Update Android System WebView to use CrackTarget.</string>
 </resources>

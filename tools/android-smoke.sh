@@ -4,7 +4,7 @@ set -euo pipefail
 adb_bin="$ANDROID_HOME/platform-tools/adb"
 emulator="$ANDROID_HOME/emulator/emulator"
 app=com.cracktarget.app
-apk=app/build/outputs/apk/debug/app-debug.apk
+apk=${CT_TEST_APK:-app/build/outputs/apk/debug/app-debug.apk}
 serial=emulator-5554
 out="$RUNNER_TEMP/cracktarget-smoke"
 avd_name=cracktarget_qa
@@ -82,3 +82,59 @@ for mode in ('threebutton', 'gestural'):
 assert levels['threebutton'] > levels['gestural'] > 0, levels
 print('Installed and launched. Five navigation controls stayed above both system navigation modes. Offline Retry was present.', levels)
 PY
+
+
+if [[ "${CT_CAPTURE_PLAY_LISTING:-0}" == 1 ]]; then
+    mkdir -p "$out/listing"
+    adb_device shell cmd connectivity airplane-mode disable
+    adb_device shell svc wifi enable
+    adb_device shell svc data enable
+    adb_device shell am force-stop "$app"
+    adb_device shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "$app/.MainActivity"
+
+    capture() {
+        local label=$1 filename=$2 marker=$3
+        for _ in {1..10}; do
+            if [[ -n "$label" ]] && adb_device shell uiautomator dump /sdcard/ct-listing.xml >/dev/null 2>&1; then
+                adb_device pull /sdcard/ct-listing.xml "$out/listing-view.xml" >/dev/null
+                local center
+                center=$(python3 - "$out/listing-view.xml" "$label" <<'PYTHON'
+from xml.etree import ElementTree
+import re
+import sys
+
+xml, label = sys.argv[1:]
+for node in ElementTree.parse(xml).iter("node"):
+    if node.get("text") == label and node.get("class") == "android.widget.Button" and node.get("package") == "com.cracktarget.app":
+        left, top, right, bottom = map(int, re.findall(r"\d+", node.get("bounds")))
+        print((left + right) // 2, (top + bottom) // 2)
+        break
+PYTHON
+)
+                if [[ -n "$center" ]]; then
+                    adb_device shell input tap $center
+                    label=""
+                fi
+            fi
+            if adb_device shell uiautomator dump /sdcard/ct-listing.xml >/dev/null 2>&1; then
+                adb_device pull /sdcard/ct-listing.xml "$out/listing-view.xml" >/dev/null
+                if grep -iqE "$marker" "$out/listing-view.xml" &&
+                   grep -Fq 'class="android.webkit.WebView"' "$out/listing-view.xml" &&
+                   ! grep -Fq 'text="Retry"' "$out/listing-view.xml" &&
+                   ! grep -iqE 'text="(Checkout|Add to cart|Buy now)"' "$out/listing-view.xml"; then
+                    adb_device exec-out screencap -p > "$out/listing/$filename.png"
+                    return 0
+                fi
+            fi
+            sleep 3
+        done
+        echo "Online listing screenshot could not be verified: $filename" >&2
+        return 1
+    }
+
+    capture "" "01-home" 'Ultimate Exam Prep|Choose a mock test|CrackTarget.*Exam Prep'
+    capture "Study" "02-study" 'Study Directory.*Exams|Study Directory.*Subjects|Explore by Subject'
+    capture "Tests" "03-mock-tests" 'Free Mock Tests 2026|Exam-Wise Online Practice|UPPCS 2026 Mock Test'
+    capture "Account" "04-account" 'Delete account.*|Aspirant Dashboard'
+    grep -Fq 'text="Delete account"' "$out/listing-view.xml"
+fi
