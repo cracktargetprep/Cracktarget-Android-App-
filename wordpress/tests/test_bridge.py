@@ -9,7 +9,7 @@ import socket
 import subprocess
 import tempfile
 import time
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 
 def run(port):
@@ -39,6 +39,8 @@ def run(port):
     assert request('confirm', state)[0] == 403
     status, headers, _ = request('confirm', state, cookies=browser)
     assert status == 303 and '/my-account/?redirect_to=' in headers['Location']
+    target = parse_qs(urlsplit(headers['Location']).query)['redirect_to'][0]
+    assert parse_qs(urlsplit(target).query) == {'ctapp_v2': ['confirm'], 'state': [state]}
     assert request('confirm', state, cookies=browser + '; fixture_user=9')[0] == 403
     customer = browser + '; fixture_user=7'
     assert 'Continue as Fixture student' in request('confirm', state, cookies=customer)[2]

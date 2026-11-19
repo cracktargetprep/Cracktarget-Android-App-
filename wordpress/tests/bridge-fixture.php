@@ -17,7 +17,9 @@ function wc_get_page_permalink( $name ) { return home_url( '/my-account/', 'http
 function add_query_arg( $args, ...$rest ) {
     $url = is_array( $args ) ? $rest[0] : $rest[1];
     $params = is_array( $args ) ? $args : array( $args => $rest[0] );
-    return $url . ( strpos( $url, '?' ) === false ? '?' : '&' ) . http_build_query( $params );
+    $pairs = array();
+    foreach ( $params as $key => $value ) $pairs[] = $key . '=' . $value;
+    return $url . ( strpos( $url, '?' ) === false ? '?' : '&' ) . implode( '&', $pairs );
 }
 function nocache_headers() {}
 function status_header( $code ) { http_response_code( $code ); }

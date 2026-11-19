@@ -2,7 +2,7 @@
 /**
  * Plugin Name: CrackTarget Android Login Bridge
  * Description: Connects a browser sign-in to a new WooCommerce session in the CrackTarget Android app.
- * Version: 2.0.0
+ * Version: 2.0.1
  * Requires PHP: 7.4
  */
 
@@ -185,7 +185,7 @@ function dispatch() {
             if ( $action === 'approve' ) {
                 expired();
             }
-            redirect( add_query_arg( 'redirect_to', endpoint( 'confirm', $state ), account_url() ) );
+            redirect( add_query_arg( 'redirect_to', rawurlencode( endpoint( 'confirm', $state ) ), account_url() ) );
         }
         $user = wp_get_current_user();
         if ( ! customer( $user ) ) {
