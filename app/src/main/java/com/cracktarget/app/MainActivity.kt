@@ -34,6 +34,8 @@ class MainActivity : Activity() {
     private val home = "https://cracktarget.com/"
     private val account = "https://cracktarget.com/my-account/"
     private val navy = Color.rgb(16, 37, 68)
+    private var loginHandoffPending = false
+    private var appSessionAvailable = false
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + .5f).toInt()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -95,7 +97,7 @@ class MainActivity : Activity() {
                 isClickable = true
                 isFocusable = true
                 setOnClickListener {
-                    if (label == "Account") {
+                    if (label == "Account" && !appSessionAvailable) {
                         // Google OAuth must NOT run in an embedded WebView. Open the
                         // existing authenticated browser session for account access.
                         openInBrowser("$account?ct_app=1")
@@ -125,6 +127,12 @@ class MainActivity : Activity() {
         }
         WebView.setWebContentsDebuggingEnabled(false)
         web.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String?) {
+                if (loginHandoffPending && url?.startsWith(account) == true) {
+                    appSessionAvailable = true
+                    loginHandoffPending = false
+                }
+            }
             override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
                 offline.visibility = View.GONE
             }
@@ -139,7 +147,8 @@ class MainActivity : Activity() {
                 // Google sign-in. Never attempt to copy Google or WooCommerce cookies.
                 if (scheme == "https" && (host == "cracktarget.com" || host == "www.cracktarget.com")) {
                     if (uri.path?.startsWith("/my-account") == true) {
-                        openInBrowser("$account?ct_app=1"); return true
+                        if (!appSessionAvailable) { openInBrowser("$account?ct_app=1"); return true }
+                        return false
                     }
                     return false
                 }
@@ -193,6 +202,7 @@ class MainActivity : Activity() {
         if (!Regex("^[a-f0-9]{64}$").matches(code)) return
         // Code is short-lived and single-use; the website sets the WooCommerce
         // authentication cookie in THIS WebView rather than the Chrome session.
+        loginHandoffPending = true
         web.loadUrl("https://cracktarget.com/?ctab_exchange=" + Uri.encode(code))
         intent.data = null
     }
