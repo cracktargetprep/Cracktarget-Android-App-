@@ -1,0 +1,77 @@
+name: Verify CrackTarget Play candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'codex/play-release']
+    paths:
+      - 'app/**'
+      - 'tools/android-smoke.sh'
+      - 'tools/android-listing-proxy.py'
+      - '.github/workflows/android-play.yml'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+      - 'build.gradle.kts'
+
+permissions:
+  contents: read
+
+jobs:
+  play-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Install Android SDK 36
+        run: |
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "$SDK/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Build release bundle and test Play edition
+        run: gradle --no-daemon bundleRelease lintRelease testReleaseUnitTest assemblePlayQa
+      - name: Verify bundle and its manifest
+        run: |
+          bundle=app/build/outputs/bundle/release/app-release.aab
+          unzip -tq "$bundle"
+          tool=agp-bundletool.jar
+          curl --fail --location --retry 3 --silent --show-error -o "$tool" https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar
+          java -jar "$tool" validate --bundle="$bundle"
+          java -jar "$tool" dump manifest --bundle="$bundle" --module=base > play-manifest.xml
+          python3 - <<'PY'
+          from xml.etree import ElementTree
+          manifest = ElementTree.parse('play-manifest.xml').getroot()
+          ns = '{http://schemas.android.com/apk/res/android}'
+          assert manifest.get('package') == 'com.cracktarget.app'
+          assert manifest.find('uses-sdk').get(ns + 'targetSdkVersion') == '36'
+          assert manifest.find('application').get(ns + 'debuggable') != 'true'
+          PY
+          sha256sum "$bundle"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CrackTarget-Play-Unsigned-AAB
+          path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+      - name: Install emulator image
+        run: sdkmanager 'emulator' 'platform-tools' 'system-images;android-36;google_apis;x86_64'
+      - name: Enable emulator hardware acceleration
+        run: sudo chmod 0666 /dev/kvm
+      - name: Verify Play edition and capture store screenshots
+        timeout-minutes: 10
+        env:
+          CT_TEST_APK: app/build/outputs/apk/playQa/app-playQa.apk
+          CT_CAPTURE_PLAY_LISTING: '1'
+        run: bash tools/android-smoke.sh
+      - name: Upload Play emulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CrackTarget-Play-Emulator-Evidence
+          path: ${{ runner.temp }}/cracktarget-smoke/
+          if-no-files-found: ignore

@@ -34,6 +34,10 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
+import org.json.JSONArray
+import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
     private lateinit var page: FrameLayout
@@ -42,6 +46,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var errorPanel: LinearLayout
     private lateinit var errorMessage: TextView
     private lateinit var googleButton: Button
+    private lateinit var accountActions: LinearLayout
+    private var playFilterReady = false
     private lateinit var browserSignIn: BrowserSignIn
     private lateinit var downloads: Downloads
     private val handler = Handler(Looper.getMainLooper())
@@ -90,6 +96,22 @@ class MainActivity : ComponentActivity() {
         root.addView(googleButton, LinearLayout.LayoutParams(-1, -2).apply {
             setMargins(dp(12), dp(3), dp(12), dp(3))
         })
+        accountActions = LinearLayout(this).apply {
+            visibility = View.GONE
+            gravity = Gravity.END
+            listOf(
+                R.string.privacy_policy to PlayWebPolicy.privacyUrl,
+                R.string.delete_account to PlayWebPolicy.deletionUrl,
+            ).forEach { (label, url) ->
+                addView(Button(this@MainActivity, null, android.R.attr.borderlessButtonStyle).apply {
+                    setText(label)
+                    isAllCaps = false
+                    minHeight = dp(48)
+                    setOnClickListener { load(url) }
+                })
+            }
+        }
+        root.addView(accountActions, LinearLayout.LayoutParams(-1, -2))
         page = FrameLayout(this)
         root.addView(page, LinearLayout.LayoutParams(-1, 0, 1f))
         errorPanel = LinearLayout(this).apply {
@@ -148,9 +170,11 @@ class MainActivity : ComponentActivity() {
         }) { load(ACCOUNT, force = true) }
         CookieManager.getInstance().setAcceptCookie(true)
         createWebView()
-        val restored = savedInstanceState?.getBundle("web")?.let(web::restoreState)
+        val restored = if (!BuildConfig.PLAY_DISTRIBUTION || playFilterReady) {
+            savedInstanceState?.getBundle("web")?.let(web::restoreState)
+        } else null
         if (restored?.currentItem != null) {
-            latestUrl = restored.currentItem?.url?.takeIf { Uri.parse(it).isSite() } ?: SITE
+            latestUrl = restored.currentItem?.url?.takeIf { Uri.parse(it).isSite() && playPageAllowed(it) } ?: SITE
             updateNavigation(latestUrl)
             historyBack.isEnabled = web.canGoBack()
             showProgress()
@@ -195,6 +219,7 @@ class MainActivity : ComponentActivity() {
                 safeBrowsingEnabled = true
                 userAgentString = "$userAgentString $APP_AGENT"
             }
+            playFilterReady = installPlayFilter(this)
             webViewClient = SiteClient()
             webChromeClient = object : WebChromeClient() {
                 override fun onProgressChanged(view: WebView, newProgress: Int) {
@@ -216,19 +241,55 @@ class MainActivity : ComponentActivity() {
                 }
             }
             setDownloadListener { url, userAgent, disposition, mimeType, _ ->
-                downloads.start(Uri.parse(url), userAgent, disposition, mimeType)
+                if (playPageAllowed(url)) downloads.start(Uri.parse(url), userAgent, disposition, mimeType)
+                else notify(R.string.play_unavailable_link)
             }
         }
         page.addView(web, 0, FrameLayout.LayoutParams(-1, -1))
     }
 
+    private fun installPlayFilter(view: WebView): Boolean {
+        if (!BuildConfig.PLAY_DISTRIBUTION) return true
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return false
+        val rules = JSONObject().apply {
+            put("shopSections", JSONArray(PlayWebPolicy.shopSections))
+            put("purchaseEndpoints", JSONArray(PlayWebPolicy.purchaseEndpoints))
+            put("checkoutQueries", JSONArray(PlayWebPolicy.checkoutQueries))
+        }
+        val js = assets.open("play-commerce-filter.js").bufferedReader().use { it.readText() }
+            .replace("/*CRACKTARGET_PLAY_RULES*/{}", rules.toString())
+        WebViewCompat.addDocumentStartJavaScript(view, js, setOf(PlayWebPolicy.siteOrigin))
+        return true
+    }
+
+    private fun playPageAllowed(url: String) = !BuildConfig.PLAY_DISTRIBUTION || PlayWebPolicy.pageAllowed(url)
+
     private inner class SiteClient : WebViewClient() {
+        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+            if (!BuildConfig.PLAY_DISTRIBUTION ||
+                (playFilterReady && PlayWebPolicy.resourceAllowed(request.url.toString(), request.isForMainFrame))) {
+                return null
+            }
+            return WebResourceResponse("text/plain", "UTF-8", 403, "Unavailable", emptyMap(),
+                java.io.ByteArrayInputStream(byteArrayOf()))
+        }
+
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             val uri = request.url
             if (!request.isForMainFrame) return uri.host == "accounts.google.com"
+            if (BuildConfig.PLAY_DISTRIBUTION && uri.scheme == "mailto" &&
+                uri.schemeSpecificPart.substringBefore('?').equals("info@cracktarget.com", ignoreCase = true) &&
+                request.hasGesture()) {
+                openExternal(uri)
+                return true
+            }
             if (uri.host == "accounts.google.com" || (uri.isSite() && uri.path == "/wp-login.php" &&
                     uri.getQueryParameter("action") == "googlesitekit_auth")) {
                 if (request.hasGesture()) browserSignIn.start()
+                return true
+            }
+            if (!playPageAllowed(uri.toString())) {
+                if (request.hasGesture()) notify(R.string.play_unavailable_link)
                 return true
             }
             if (uri.isSite()) {
@@ -253,7 +314,7 @@ class MainActivity : ComponentActivity() {
 
         override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
             if (url == null) return
-            if (!Uri.parse(url).isSite()) {
+            if (!Uri.parse(url).isSite() || !playPageAllowed(url)) {
                 view.stopLoading()
                 showError(R.string.page_unavailable)
                 return
@@ -313,6 +374,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateNavigation(url: String) {
+        val path = Uri.parse(url).path.orEmpty().trimEnd('/')
+        accountActions.visibility = if (BuildConfig.PLAY_DISTRIBUTION &&
+            (path == "/my-account" || path.startsWith("/my-account/"))) View.VISIBLE else View.GONE
         var selected = destinations.indexOfFirst { (_, destination) ->
             destination != SITE && url.startsWith(destination)
         }
@@ -335,6 +399,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun load(url: String, force: Boolean = false) {
+        if (BuildConfig.PLAY_DISTRIBUTION && !playFilterReady) {
+            showError(R.string.play_webview_update)
+            return
+        }
+        if (!playPageAllowed(url)) {
+            notify(R.string.play_unavailable_link)
+            return
+        }
         if (force || web.url != url) {
             if (loading) web.stopLoading()
             if (force && web.url == url && !mainFrameError) web.reload() else web.loadUrl(url)

@@ -52,6 +52,9 @@ internal class Downloads(private val activity: Activity) {
         // Once a redirect leaves CrackTarget, never send account cookies again.
         var allowAccountCookies = uri.isSite()
         repeat(6) {
+            if (BuildConfig.PLAY_DISTRIBUTION && !PlayWebPolicy.pageAllowed(current.toString())) {
+                throw IOException("Download unavailable in the Play edition")
+            }
             val connection = URL(current.toString()).openConnection() as HttpsURLConnection
             try {
                 connection.instanceFollowRedirects = false
