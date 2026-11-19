@@ -48,6 +48,8 @@ for mode in threebutton gestural; do
     overlay="com.android.internal.systemui.navbar.$mode"
     adb_device shell cmd overlay enable-exclusive --category "$overlay"
     adb_device shell cmd overlay list android | grep -F "[x] $overlay"
+    # The overlay is enabled before System UI finishes applying new insets.
+    sleep 3
     adb_device shell am force-stop "$app"
     adb_device shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "$app/.MainActivity"
     for _ in {1..10}; do
@@ -57,6 +59,10 @@ for mode in threebutton gestural; do
         fi
         sleep 2
     done
+    # Pair the final accessibility bounds with the settled frame.
+    sleep 2
+    adb_device shell uiautomator dump /sdcard/ct-qa.xml >/dev/null
+    adb_device pull /sdcard/ct-qa.xml "$out/$mode.xml" >/dev/null
     adb_device exec-out screencap -p > "$out/$mode.png"
 done
 
@@ -135,6 +141,6 @@ PYTHON
     capture "" "01-home" 'Ultimate Exam Prep|Choose a mock test|CrackTarget.*Exam Prep'
     capture "Study" "02-study" 'Study Directory.*Exams|Study Directory.*Subjects|Explore by Subject'
     capture "Tests" "03-mock-tests" 'Free Mock Tests 2026|Exam-Wise Online Practice|UPPCS 2026 Mock Test'
-    capture "Account" "04-account" 'Delete account.*|Aspirant Dashboard'
+    capture "Account" "04-account" 'Aspirant Dashboard|Sign in to your account|woocommerce-form-login'
     grep -Fq 'text="Delete account"' "$out/listing-view.xml"
 fi
