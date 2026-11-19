@@ -12,7 +12,7 @@ php -l wordpress/ct-app-login-bridge/ct-app-login-bridge.php
 python3 wordpress/tests/test_bridge.py
 ```
 
-The sideload APK is `app/build/outputs/apk/debug/app-debug.apk`. It is debug-signed. Android only installs an update over an existing APK if the signing certificates match. Use a separate test device or Android profile to keep existing app-local data intact when certificates differ.
+The sideload APK is `app/build/outputs/apk/debug/app-debug.apk`. It is debug-signed. Android only installs an update over an existing APK if the signing certificates match. Use a separate test device to keep existing app-local data intact when certificates differ. Installing another build of the same app on the same device requires removing the previous build first.
 
 ## Browser sign-in
 
