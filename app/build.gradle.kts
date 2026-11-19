@@ -10,8 +10,8 @@ android {
         applicationId = "com.cracktarget.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.4.0"
+        versionCode = 5
+        versionName = "1.5.0"
         buildConfigField("boolean", "PLAY_DISTRIBUTION", "false")
     }
     buildFeatures { buildConfig = true }
@@ -37,5 +37,6 @@ dependencies {
     implementation("androidx.core:core:1.16.0")
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.webkit:webkit:1.12.1")
+    implementation("org.jsoup:jsoup:1.19.1")
     testImplementation("junit:junit:4.13.2")
 }
