@@ -98,7 +98,7 @@ class MainActivity : Activity() {
                     if (label == "Account") {
                         // Google OAuth must NOT run in an embedded WebView. Open the
                         // existing authenticated browser session for account access.
-                        openInBrowser(account)
+                        openInBrowser("$account?ct_app=1")
                     } else {
                         offline.visibility = View.GONE
                         web.loadUrl(url)
@@ -139,7 +139,7 @@ class MainActivity : Activity() {
                 // Google sign-in. Never attempt to copy Google or WooCommerce cookies.
                 if (scheme == "https" && (host == "cracktarget.com" || host == "www.cracktarget.com")) {
                     if (uri.path?.startsWith("/my-account") == true) {
-                        openInBrowser(uri.toString()); return true
+                        openInBrowser("$account?ct_app=1"); return true
                     }
                     return false
                 }
@@ -177,6 +177,24 @@ class MainActivity : Activity() {
             } catch (_: Exception) { Toast.makeText(this, "Download could not start", Toast.LENGTH_SHORT).show() }
         })
         if (savedInstanceState == null) web.loadUrl(home) else web.restoreState(savedInstanceState)
+        handleLoginCallback(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleLoginCallback(intent)
+    }
+
+    private fun handleLoginCallback(intent: Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.scheme != "ctapp" || uri.host != "auth") return
+        val code = uri.getQueryParameter("code") ?: return
+        if (!Regex("^[a-f0-9]{64}$").matches(code)) return
+        // Code is short-lived and single-use; the website sets the WooCommerce
+        // authentication cookie in THIS WebView rather than the Chrome session.
+        web.loadUrl("https://cracktarget.com/?ctab_exchange=" + Uri.encode(code))
+        intent.data = null
     }
 
     private fun openInBrowser(url: String) {
