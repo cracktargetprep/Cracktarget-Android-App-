@@ -22,7 +22,11 @@ jobs:
         with:
           gradle-version: '8.13'
       - name: Install Android SDK 36
-        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+        run: |
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "$SDK/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
       - name: Verify WordPress bridge syntax
         run: |
           php -l wordpress/ct-app-login-bridge/ct-app-login-bridge.php
