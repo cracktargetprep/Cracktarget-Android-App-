@@ -1,0 +1,78 @@
+name: Android Play release
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/play-release.yml'
+      - 'app/**'
+      - '*.gradle.kts'
+      - 'gradle.properties'
+      - 'wordpress/**'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Compile, lint, test and bundle
+        run: gradle --no-daemon lintRelease testReleaseUnitTest assemblePlayQa bundleRelease
+      - name: Test WordPress authentication bridge
+        run: |
+          php -l wordpress/ct-app-login-bridge/ct-app-login-bridge.php
+          python3 wordpress/tests/test_bridge.py
+      - name: Upload QA APK and unsigned bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: cracktarget-play-qa-and-unsigned-bundle
+          path: |
+            app/build/outputs/apk/playQa/*.apk
+            app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+      - name: Sign bundle with owner-managed upload key
+        id: signing
+        env:
+          PLAY_UPLOAD_KEYSTORE_B64: ${{ secrets.PLAY_UPLOAD_KEYSTORE_B64 }}
+          PLAY_UPLOAD_STORE_PASSWORD: ${{ secrets.PLAY_UPLOAD_STORE_PASSWORD }}
+          PLAY_UPLOAD_KEY_ALIAS: ${{ secrets.PLAY_UPLOAD_KEY_ALIAS }}
+          PLAY_UPLOAD_KEY_PASSWORD: ${{ secrets.PLAY_UPLOAD_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$PLAY_UPLOAD_KEYSTORE_B64" && -z "$PLAY_UPLOAD_STORE_PASSWORD" && -z "$PLAY_UPLOAD_KEY_ALIAS" && -z "$PLAY_UPLOAD_KEY_PASSWORD" ]]; then
+            echo "::notice::No upload key configured. QA and unsigned AAB only; not ready for submission."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          : "${PLAY_UPLOAD_KEYSTORE_B64:?Missing keystore}"
+          : "${PLAY_UPLOAD_STORE_PASSWORD:?Missing store password}"
+          : "${PLAY_UPLOAD_KEY_ALIAS:?Missing key alias}"
+          : "${PLAY_UPLOAD_KEY_PASSWORD:?Missing key password}"
+          umask 077
+          keystore="$(mktemp)"
+          trap 'rm -f "$keystore"' EXIT
+          printf '%s' "$PLAY_UPLOAD_KEYSTORE_B64" | base64 --decode > "$keystore"
+          mkdir -p signed
+          bundle=app/build/outputs/bundle/release/app-release.aab
+          jarsigner -keystore "$keystore" -storepass:env PLAY_UPLOAD_STORE_PASSWORD -keypass:env PLAY_UPLOAD_KEY_PASSWORD -signedjar signed/cracktarget-play-release.aab "$bundle" "$PLAY_UPLOAD_KEY_ALIAS"
+          jarsigner -verify signed/cracktarget-play-release.aab | tee "$RUNNER_TEMP/signature-check.txt"
+          grep -q 'jar verified\.' "$RUNNER_TEMP/signature-check.txt"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+      - name: Upload signed Play bundle
+        if: steps.signing.outputs.signed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cracktarget-signed-play-release
+          path: signed/cracktarget-play-release.aab
+          if-no-files-found: error
