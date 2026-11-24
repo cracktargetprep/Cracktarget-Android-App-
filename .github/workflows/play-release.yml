@@ -24,8 +24,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
-      - name: Install Android SDK
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Install Android SDK 36
+        run: |
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "$SDK/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
       - name: Compile, lint, test and bundle
         run: gradle --no-daemon lintRelease testReleaseUnitTest assemblePlayQa bundleRelease
       - name: Test WordPress authentication bridge
