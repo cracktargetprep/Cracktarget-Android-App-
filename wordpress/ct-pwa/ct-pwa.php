@@ -2,7 +2,7 @@
 /**
  * Plugin Name: CrackTarget PWA
  * Description: Installable study launcher with network-only account, payment and exam navigation.
- * Version: 1.1.1
+ * Version: 1.1.2
  * Author: CrackTarget
  */
 defined('ABSPATH') || exit;
@@ -40,7 +40,7 @@ function ctpwa_assets() { ?>
 </script>
 <?php }
 function ctpwa_tile($path,$symbol,$title,$desc){echo '<a class="tile" href="'.esc_url(ctpwa_url($path)).'"><span class="sym" aria-hidden="true">'.esc_html($symbol).'</span><b>'.esc_html($title).'</b><small>'.esc_html($desc).'</small></a>';}
-function ctpwa_dashboard(){ ?><main id="ctpwa"><div class="wrap"><header><?php if(ctpwa_icon(192)): ?><img src="<?php echo esc_url(ctpwa_icon(192)); ?>" alt=""><?php endif; ?><div><strong>CrackTarget</strong><small>Every Question Has a Purpose.</small></div></header><small>YOUR STUDY SPACE</small><h1>Hello, Aspirant!</h1><p>Pick your next step. Learn, practise and revise.</p><form class="ct-search" action="<?php echo esc_url(home_url('/')); ?>" method="get" role="search"><label for="ct-app-search" class="ct-sr">Search CrackTarget</label><input id="ct-app-search" name="s" type="search" placeholder="Search exams, notes, tests &amp; books" required><button type="submit">Search</button></form><h2 class="ct-focus-title">Exam Focus</h2><div class="ct-focus-grid"><section class="hero"><small>UPSC RECRUITMENT</small><h2>UPSC EPFO APFC</h2><p>Exam-focused study notes, PYQs and mock tests.</p><a href="<?php echo esc_url(ctpwa_url('upsc-epfo/')); ?>">Explore APFC &rarr;</a></section><section class="hero ct-sao"><small>UPSC RECRUITMENT</small><h2>DRDO SAO Grade-II</h2><p>Senior Administrative Officer preparation, study materials, PYQs and mock tests.</p><a href="<?php echo esc_url(ctpwa_url('senior-administrative-officer-grade-ii-in-defence-research-development-organization-drdo/')); ?>">Explore DRDO SAO &rarr;</a></section></div><h2>Explore &amp; learn</h2><div class="grid"><?php ctpwa_tile('mocktest/','✓','Mock Tests','Practice by exam');ctpwa_tile('current-affairs/','▤','Current Affairs','Daily updates');ctpwa_tile('study-directory/','▥','All Exams & Study Notes','Subjects and exams');ctpwa_tile('previous-years-questions/','≡','Previous Papers','Solved PYQs');ctpwa_tile('vacancies/','◈','Latest Vacancies','Recruitment updates');ctpwa_tile('shop/','▣','Digital Books','Explore the store'); ?></div><h2>Your account</h2><div class="grid"><?php ctpwa_tile('my-account/','◉','My Account','Sign in, orders and downloads');ctpwa_tile('?ct_full_site=1','⌂','Full Website','Explore all resources'); ?></div><section id="ctpwa-install-panel" class="install"><b>Keep CrackTarget on your home screen</b><p>Open your study space in one tap.</p><button id="ctpwa-install" type="button" hidden>Install CrackTarget</button><p id="ctpwa-install-note"><small>Android: Chrome menu &rarr; Add to Home screen / Install app. iPhone: Safari Share &rarr; Add to Home Screen.</small></p></section><p><small>Internet is required for learning, sign-in, tests and payments. <a href="<?php echo esc_url(ctpwa_url('privacy-policy/')); ?>">Privacy policy</a>.</small></p></div><nav aria-label="Study app navigation"><?php foreach(array('ct-app/'=>array('⌂','Home'),'mocktest/'=>array('✓','Tests'),'current-affairs/'=>array('▤','Daily CA'),'study-directory/'=>array('▥','Library'),'my-account/'=>array('◉','Account')) as $p=>$v){echo '<a href="'.esc_url(ctpwa_url($p)).'"><span aria-hidden="true">'.esc_html($v[0]).'</span>'.esc_html($v[1]).'</a>';} ?></nav></main><?php }
+function ctpwa_dashboard(){ ?><main id="ctpwa"><div class="wrap"><header><?php if(ctpwa_icon(192)): ?><img src="<?php echo esc_url(ctpwa_icon(192)); ?>" alt=""><?php endif; ?><div><strong>CrackTarget</strong><small>Every Question Has a Purpose.</small></div></header><small>YOUR STUDY SPACE</small><h1>Hello, Aspirant!</h1><p>Pick your next step. Learn, practise and revise.</p><form class="ct-search" action="<?php echo esc_url(home_url('/')); ?>" method="get" role="search"><label for="ct-app-search" class="ct-sr">Search CrackTarget</label><input id="ct-app-search" name="s" type="search" placeholder="Search exams, notes, tests &amp; books" required><button type="submit">Search</button></form><h2 class="ct-focus-title">Exam Focus</h2><div class="ct-focus-grid"><section class="hero"><small>UPSC RECRUITMENT</small><h2>UPSC EPFO APFC</h2><p>Exam-focused study notes, PYQs and mock tests.</p><a href="<?php echo esc_url(ctpwa_url('upsc-epfo/')); ?>">Explore APFC &rarr;</a></section><section class="hero ct-sao"><small>UPSC RECRUITMENT</small><h2>DRDO SAO Grade-II</h2><p>Senior Administrative Officer preparation, study materials, PYQs and mock tests.</p><a href="<?php echo esc_url(ctpwa_url('senior-administrative-officer-grade-ii-in-defence-research-development-organization-drdo/')); ?>">Explore DRDO SAO &rarr;</a></section></div><h2>Explore &amp; learn</h2><div class="grid"><?php ctpwa_tile('mocktest/','✓','Mock Tests','Practice by exam');ctpwa_tile('current-affairs/','▤','Current Affairs','Daily updates');ctpwa_tile('study-directory/','▥','All Exams & Study Notes','Subjects and exams');ctpwa_tile('previous-years-questions/','≡','Previous Papers','Solved PYQs');ctpwa_tile('vacancies/','◈','Latest Vacancies','Recruitment updates');ctpwa_tile('shop/','▣','Digital Books','Explore the store'); ?></div><h2>Your account</h2><div class="grid"><?php ctpwa_tile('my-account/','◉','My Account','Sign in, orders and downloads');ctpwa_tile('?ct_full_site=1','⌂','Full Website','Open the original website'); ?></div><section id="ctpwa-install-panel" class="install"><b>Keep CrackTarget on your home screen</b><p>Open your study space in one tap.</p><button id="ctpwa-install" type="button" hidden>Install CrackTarget</button><p id="ctpwa-install-note"><small>Android: Chrome menu &rarr; Add to Home screen / Install app. iPhone: Safari Share &rarr; Add to Home Screen.</small></p></section><p><small>Internet is required for learning, sign-in, tests and payments. <a href="<?php echo esc_url(ctpwa_url('privacy-policy/')); ?>">Privacy policy</a>.</small></p></div><nav aria-label="Study app navigation"><?php foreach(array('ct-app/'=>array('⌂','Home'),'mocktest/'=>array('✓','Tests'),'current-affairs/'=>array('▤','Daily CA'),'study-directory/'=>array('▥','Library'),'my-account/'=>array('◉','Account')) as $p=>$v){echo '<a href="'.esc_url(ctpwa_url($p)).'"><span aria-hidden="true">'.esc_html($v[0]).'</span>'.esc_html($v[1]).'</a>';} ?></nav></main><?php }
 function ctpwa_render(){
   status_header(200);nocache_headers();header('Content-Type: text/html; charset=UTF-8');header('X-Robots-Tag: noindex, follow');
   ?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>CrackTarget | Study App</title><?php ctpwa_head();ctpwa_assets(); ?></head><body style="margin:0"><?php ctpwa_dashboard(); ?></body></html><?php exit;
@@ -91,12 +91,36 @@ function ctpwa_nav_enabled(){
  }
  return function_exists('is_product')&&is_product();
 }
-add_action('wp_head',function(){if(ctpwa_home_enabled())ctpwa_head();},20);
+add_action('wp_head',function(){if(!ctpwa_home_enabled())return;ctpwa_head();echo '<style>#ctpwa-mobile-home{display:none}@media(max-width:1023px){#ctpwa-mobile-home{display:block}body.ctpwa-clean-home > .ctpwa-legacy-shell{display:none!important}body.ctpwa-clean-home{margin:0!important;min-height:100vh;overflow-x:hidden;background:#f5f7fb}body.ctpwa-clean-home #ctpwa-mobile-home{isolation:auto!important;position:relative;z-index:auto!important}body.ctpwa-clean-home #ctpwa-mobile-home #ctpwa{min-height:100vh;padding-bottom:calc(92px + env(safe-area-inset-bottom))}body.ctpwa-clean-home #ctpwa-mobile-home #ctpwa nav{position:fixed!important;z-index:9999!important;bottom:0!important;left:0!important;right:0!important}body.ctpwa-clean-home #ctpwa-mobile-home #ctpwa nav a{white-space:nowrap}body.ctpwa-clean-home #ctpwa-mobile-home #ctpwa .hero h2{line-height:1.2}}</style>';},20);
 add_action('wp_body_open','ctpwa_home_markup',1);
 add_action('wp_footer',function(){
  if(ctpwa_home_enabled()){
    ctpwa_home_markup();ctpwa_assets();?>
-<script>(function(){const el=document.getElementById('ctpwa-mobile-home');if(!el)return;const native=/; wv\)|CrackTargetAndroid/i.test(navigator.userAgent);if(native){el.hidden=true;return;}if(el.parentNode!==document.body||el!==document.body.firstElementChild){const bar=document.getElementById('wpadminbar');if(bar&&bar.parentNode===document.body)bar.after(el);else document.body.prepend(el);} })();</script>
+<script>(function(){
+ const el=document.getElementById('ctpwa-mobile-home');if(!el)return;
+ if(/; wv\)|CrackTargetAndroid/i.test(navigator.userAgent)){el.hidden=true;return;}
+ const bar=document.getElementById('wpadminbar');
+ if(bar&&bar.parentNode===document.body)bar.after(el);else document.body.prepend(el);
+ const mq=matchMedia('(max-width: 1023px)');
+ const shellSelector='main,header,footer,#page,#site,#content,#masthead,#colophon,.site,.site-content,.wp-site-blocks,.site-header,.site-footer';
+ const excluded='script,style,link,template,noscript,dialog,[role="dialog"],[aria-live],#wpadminbar,[id*="cookie" i],[class*="cookie" i],[id*="consent" i],[class*="consent" i]';
+ function sync(){
+   const mobile=mq.matches;
+   for(const child of Array.from(document.body.children)){
+     if(child===el||child.matches(excluded))continue;
+     const containsOldHeading=Array.from(child.querySelectorAll('h1,h2')).some(h=>/Exam guides, books and mock tests|Your preparation starts with a clear destination|Featured products/.test(h.textContent));
+     const legacy=child.matches(shellSelector)||containsOldHeading||!!child.querySelector('main, #masthead, .site-header, .wp-site-blocks');
+     if(legacy)child.classList.add('ctpwa-legacy-shell');
+   }
+   document.body.classList.toggle('ctpwa-clean-home',mobile);
+   for(const child of document.querySelectorAll('body > .ctpwa-legacy-shell')){
+     if(mobile&&!child.hasAttribute('inert')){child.setAttribute('inert','');child.dataset.ctpwaInert='1';}
+     if(!mobile&&child.dataset.ctpwaInert==='1'){child.removeAttribute('inert');delete child.dataset.ctpwaInert;}
+   }
+ }
+ sync();mq.addEventListener?mq.addEventListener('change',sync):mq.addListener(sync);
+ window.addEventListener('pageshow',sync);window.addEventListener('load',sync);
+})();</script>
 <?php return;
  }
  if(!ctpwa_nav_enabled())return;
