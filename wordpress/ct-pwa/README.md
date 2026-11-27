@@ -1,0 +1,2 @@
+# CrackTarget PWA 1.0.0
+Public, standalone launcher at /ct-app/. Manifest and service worker served by WordPress. Network-only; no customer, payment, exam, or account data is cached by this plugin. The only service worker fetch interception is the launcher navigation with a generic offline fallback. Existing theme and WooCommerce unchanged. Activate on WordPress, verify icons, installation on Android/iOS, login, checkout and mock-test navigation; deactivate to remove launcher and manifest (installed clients may need to remove the app).
