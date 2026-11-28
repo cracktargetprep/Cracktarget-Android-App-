@@ -5,3 +5,5 @@ CrackTarget PWA 1.1.0: responsive mobile homepage dashboard, existing homepage p
 1.1.2: On narrow homepage viewports, isolate the app dashboard from duplicate legacy homepage sections; original content remains on desktop and via ?ct_full_site=1. No redirects. Restore old shell on viewport changes. Native Android unchanged.
 
 1.2.0: Native system typography, explicit light text on both exam cards, improved accessible SVG icons, mobile card stacking and larger navigation. No external font dependency, no changes to site routes or user data.
+
+1.3.0: APFC and DRDO SAO remain featured. Adds 17 compact two-column exam links with verified destinations; PFRDA available as a quiet archive link, not a highlight. Existing service worker, install logic, URLs, account and payment flow untouched. Backup: wordpress/backups/ct-pwa-1.2.0/ and original wordpress/releases/ct-pwa-1.2.0.zip.

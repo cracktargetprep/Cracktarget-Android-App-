@@ -2,7 +2,7 @@
 /**
  * Plugin Name: CrackTarget PWA
  * Description: Installable study launcher with network-only account, payment and exam navigation.
- * Version: 1.2.0
+ * Version: 1.3.0
  * Author: CrackTarget
  */
 defined('ABSPATH') || exit;
@@ -42,6 +42,30 @@ function ctpwa_assets() { ?>
 @media(prefers-reduced-motion:no-preference){#ctpwa .tile,#ctpwa .hero a{transition:transform .16s,box-shadow .16s}#ctpwa .tile:active,#ctpwa .hero a:active{transform:scale(.98)}}
 
 @media(max-width:1023px){#ctpwa-mobile-home.ctpwa-phone #ctpwa .ct-focus-grid{grid-template-columns:1fr}#ctpwa-mobile-home.ctpwa-phone #ctpwa .grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* 1.3.0: compact, accessible exam directory. */
+#ctpwa .ct-hubs{margin:26px 0 6px}
+#ctpwa .ct-hubs-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:13px}
+#ctpwa .ct-hubs-head h2{margin:4px 0 0!important;font-size:22px!important}
+#ctpwa .ct-hubs-head .ct-eyebrow{font-size:10px!important;letter-spacing:1.1px}
+#ctpwa .ct-hubs-all{color:#14694c!important;font-weight:750;font-size:12px;white-space:nowrap;min-height:44px;display:flex;align-items:center}
+#ctpwa .ct-hubs-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#ctpwa .ct-hub-card{display:flex;align-items:flex-start;gap:9px;position:relative;padding:13px 10px 13px 11px;min-height:94px;min-width:0;background:#fff!important;border:1px solid #dce5ef;border-radius:16px;box-shadow:0 4px 13px #14233b0b;color:#14233b!important;text-decoration:none!important}
+#ctpwa .ct-hub-icon{display:grid;place-items:center;flex:0 0 33px;width:33px;height:33px;border-radius:10px;background:#e5eefc;color:#254f91}
+#ctpwa .ct-hub-icon svg{width:21px;height:21px;display:block}
+#ctpwa .ct-hub-law .ct-hub-icon,#ctpwa .ct-hub-state .ct-hub-icon{background:#fff0dc;color:#9b5300}
+#ctpwa .ct-hub-leaf .ct-hub-icon,#ctpwa .ct-hub-health .ct-hub-icon{background:#e0f3e9;color:#136d4c}
+#ctpwa .ct-hub-shield .ct-hub-icon{background:#eae5ff;color:#6045a5}
+#ctpwa .ct-hub-copy{display:flex;flex:1;flex-direction:column;gap:4px;min-width:0}
+#ctpwa .ct-hub-copy strong{font-size:14px!important;font-weight:780!important;color:#14233b!important;line-height:1.25!important;overflow-wrap:anywhere;letter-spacing:-.15px}
+#ctpwa .ct-hub-copy small{font-size:11px!important;color:#52647b!important;line-height:1.35!important;overflow-wrap:anywhere}
+#ctpwa .ct-hub-arrow{flex:0 0 7px;font-size:19px;line-height:1.2;color:#60738b}
+#ctpwa .ct-hubs-archive{font-size:12px!important;color:#52647b!important;line-height:1.5!important;margin:12px 2px 0!important}
+#ctpwa .ct-hubs-archive a{color:#14694c!important;text-decoration:underline!important;text-underline-offset:3px}
+@media(max-width:380px){#ctpwa .ct-hub-card{gap:7px;padding:11px 8px;min-height:96px}#ctpwa .ct-hub-icon{width:28px;height:28px;flex-basis:28px}#ctpwa .ct-hub-icon svg{width:18px;height:18px}#ctpwa .ct-hub-arrow{display:none}#ctpwa .ct-hub-copy strong{font-size:13px!important}}
+@media(min-width:720px){#ctpwa .ct-hub-card{min-height:83px;padding:15px 14px;align-items:center}#ctpwa .ct-hub-copy strong{font-size:16px!important}#ctpwa .ct-hub-copy small{font-size:12px!important}}
+@media(prefers-reduced-motion:no-preference){#ctpwa .ct-hub-card{transition:transform .16s,border-color .16s,box-shadow .16s}#ctpwa .ct-hub-card:hover{border-color:#aac8be;box-shadow:0 6px 18px #14233b12}#ctpwa .ct-hub-card:active{transform:scale(.98)}}
+
 </style>
 <script>
 (function(){
@@ -72,7 +96,52 @@ function ctpwa_svg($symbol){
  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'.($icons[$symbol]??$icons['⌂']).'</svg>';
 }
 function ctpwa_tile($path,$symbol,$title,$desc){echo '<a class="tile" href="'.esc_url(ctpwa_url($path)).'"><span class="sym" aria-hidden="true">'.ctpwa_svg($symbol).'</span><b>'.esc_html($title).'</b><small>'.esc_html($desc).'</small></a>';}
-function ctpwa_dashboard(){ ?><main id="ctpwa"><div class="wrap"><header><?php if(ctpwa_icon(192)): ?><img src="<?php echo esc_url(ctpwa_icon(192)); ?>" alt=""><?php endif; ?><div><strong>CrackTarget</strong><small>Every Question Has a Purpose.</small></div></header><small class="ct-eyebrow">YOUR STUDY SPACE</small><h1>Hello, Aspirant!</h1><p>Pick your next step. Learn, practise and revise.</p><form class="ct-search" action="<?php echo esc_url(home_url('/')); ?>" method="get" role="search"><label for="ct-app-search" class="ct-sr">Search CrackTarget</label><input id="ct-app-search" name="s" type="search" placeholder="Search exams, notes, tests &amp; books" required><button type="submit">Search</button></form><h2 class="ct-focus-title">Exam Focus</h2><div class="ct-focus-grid"><section class="hero"><small class="ct-tag">UPSC RECRUITMENT</small><h2>UPSC EPFO APFC</h2><p>Exam-focused study notes, PYQs and mock tests.</p><a href="<?php echo esc_url(ctpwa_url('upsc-epfo/')); ?>">Explore APFC &rarr;</a></section><section class="hero ct-sao"><small class="ct-tag">UPSC RECRUITMENT</small><h2>DRDO SAO Grade-II</h2><p>Senior Administrative Officer preparation, study materials, PYQs and mock tests.</p><a href="<?php echo esc_url(ctpwa_url('senior-administrative-officer-grade-ii-in-defence-research-development-organization-drdo/')); ?>">Explore DRDO SAO &rarr;</a></section></div><h2>Explore &amp; learn</h2><div class="grid"><?php ctpwa_tile('mocktest/','✓','Mock Tests','Practice by exam');ctpwa_tile('current-affairs/','▤','Current Affairs','Daily updates');ctpwa_tile('study-directory/','▥','All Exams & Study Notes','Subjects and exams');ctpwa_tile('previous-years-questions/','≡','Previous Papers','Solved PYQs');ctpwa_tile('vacancies/','◈','Latest Vacancies','Recruitment updates');ctpwa_tile('shop/','▣','Digital Books','Explore the store'); ?></div><h2>Your account</h2><div class="grid"><?php ctpwa_tile('my-account/','◉','My Account','Sign in, orders and downloads');ctpwa_tile('?ct_full_site=1','⌂','Full Website','Open the original website'); ?></div><section id="ctpwa-install-panel" class="install"><b>Keep CrackTarget on your home screen</b><p>Open your study space in one tap.</p><button id="ctpwa-install" type="button" hidden>Install CrackTarget</button><p id="ctpwa-install-note"><small>Android: Chrome menu &rarr; Add to Home screen / Install app. iPhone: Safari Share &rarr; Add to Home Screen.</small></p></section><p><small>Internet is required for learning, sign-in, tests and payments. <a href="<?php echo esc_url(ctpwa_url('privacy-policy/')); ?>">Privacy policy</a>.</small></p></div><nav aria-label="Study app navigation"><?php foreach(array('ct-app/'=>array('⌂','Home'),'mocktest/'=>array('✓','Tests'),'current-affairs/'=>array('▤','Daily CA'),'study-directory/'=>array('▥','Library'),'my-account/'=>array('◉','Account')) as $p=>$v){echo '<a href="'.esc_url(ctpwa_url($p)).'"><span aria-hidden="true">'.ctpwa_svg($v[0]).'</span>'.esc_html($v[1]).'</a>';} ?></nav></main><?php }
+function ctpwa_exam_hubs(){
+ $hubs=array(
+  array('up-judiciary-2026-preparation-hub/','UP Judiciary','PCS-J · GK & Law','law'),
+  array('bpsc/','BPSC','Bihar civil services','state'),
+  array('uppcs/','UPPCS','Prelims & mains','state'),
+  array('nabard-grade-a/','NABARD Grade A','ARD, ESI & practice','leaf'),
+  array('rbi/','RBI Grade B','Finance, ESI & FM','bank'),
+  array('sebi/','SEBI Grade A','Securities & markets','market'),
+  array('irdai-grade-a-assistant-manager-2026-syllabus-pattern-strategy/','IRDAI Grade A','Insurance & strategy','shield'),
+  array('ifsca-grade-a-2026-preparation-hub/','IFSCA Grade A','IFSC & financial markets','bank'),
+  array('bank-so-credit-officer-2026-preparation-hub/','Bank SO','Credit officer preparation','bank'),
+  array('ayurvedic-medical-officers-full-preparation/','Ayurveda AMO','Medical officer preparation','health'),
+  array('sidbi/','SIDBI Grade A & B','MSME finance','market'),
+  array('judiciary/upsc-law-recruitment-2027/','UPSC Law RT','Prosecution & legal posts','law'),
+  array('upsc-capf-assistant-commandant/','UPSC CAPF AC','Assistant commandant','shield'),
+  array('upsc-combined-medical-services-examination/','UPSC CMS','Combined medical services','health'),
+  array('upsc-engineering-services-2027/','UPSC ESE','Engineering services','state'),
+  array('iifcl-grade-a-2026-domain-knowledge-study-guide/','IIFCL Grade A','Project finance','market'),
+  array('nabfid-lending-operations-infrastructure-finance-guide/','NaBFID Officer','Infrastructure finance','bank')
+ );
+ $icons=array(
+  'law'=>'<path d="M12 3v17M5 21h14M4 7h16M6 7l-4 8h8L6 7zm12 0-4 8h8l-4-8z"/>',
+  'state'=>'<path d="M3 10 12 3l9 7M5 10h14M6 10v8m4-8v8m4-8v8m4-8v8M3 21h18"/>',
+  'leaf'=>'<path d="M20 4c-9 0-15 4-15 11a5 5 0 0 0 5 5c7 0 10-7 10-16ZM4 21 15 10"/>',
+  'bank'=>'<path d="m3 9 9-6 9 6M3 9h18M6 9v10m6-10v10m6-10v10M3 21h18"/>',
+  'market'=>'<path d="M4 4v16h16M7 15l4-5 4 3 5-7M16 6h4v4"/>',
+  'shield'=>'<path d="m12 3 8 3v6c0 5-3 8-8 10-5-2-8-5-8-10V6zM8 12l3 3 5-6"/>',
+  'health'=>'<path d="M12 21 4 13a5 5 0 0 1 7-7l1 1 1-1a5 5 0 0 1 7 7zM8 12h2l1-2 2 4 1-2h2"/>'
+ );
+ ?>
+ <section class="ct-hubs" aria-labelledby="ct-hubs-heading">
+  <div class="ct-hubs-head"><div><small class="ct-eyebrow">EXPLORE BY EXAM</small><h2 id="ct-hubs-heading">More Exam Hubs</h2></div><a class="ct-hubs-all" href="<?php echo esc_url(ctpwa_url('study-directory/')); ?>">All resources &rarr;</a></div>
+  <div class="ct-hubs-grid">
+  <?php foreach($hubs as $hub){ ?>
+   <a class="ct-hub-card ct-hub-<?php echo esc_attr($hub[3]); ?>" href="<?php echo esc_url(ctpwa_url($hub[0])); ?>">
+    <span class="ct-hub-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><?php echo $icons[$hub[3]]; ?></svg></span>
+    <span class="ct-hub-copy"><strong><?php echo esc_html($hub[1]); ?></strong><small><?php echo esc_html($hub[2]); ?></small></span>
+    <span class="ct-hub-arrow" aria-hidden="true">&rsaquo;</span>
+   </a>
+  <?php } ?>
+  </div>
+  <p class="ct-hubs-archive">Looking for earlier exam material? <a href="<?php echo esc_url(ctpwa_url('pfrda2026/')); ?>">PFRDA resources</a> remain available.</p>
+ </section>
+ <?php
+}
+function ctpwa_dashboard(){ ?><main id="ctpwa"><div class="wrap"><header><?php if(ctpwa_icon(192)): ?><img src="<?php echo esc_url(ctpwa_icon(192)); ?>" alt=""><?php endif; ?><div><strong>CrackTarget</strong><small>Every Question Has a Purpose.</small></div></header><small class="ct-eyebrow">YOUR STUDY SPACE</small><h1>Hello, Aspirant!</h1><p>Pick your next step. Learn, practise and revise.</p><form class="ct-search" action="<?php echo esc_url(home_url('/')); ?>" method="get" role="search"><label for="ct-app-search" class="ct-sr">Search CrackTarget</label><input id="ct-app-search" name="s" type="search" placeholder="Search exams, notes, tests &amp; books" required><button type="submit">Search</button></form><h2 class="ct-focus-title">Exam Focus</h2><div class="ct-focus-grid"><section class="hero"><small class="ct-tag">UPSC RECRUITMENT</small><h2>UPSC EPFO APFC</h2><p>Exam-focused study notes, PYQs and mock tests.</p><a href="<?php echo esc_url(ctpwa_url('upsc-epfo/')); ?>">Explore APFC &rarr;</a></section><section class="hero ct-sao"><small class="ct-tag">UPSC RECRUITMENT</small><h2>DRDO SAO Grade-II</h2><p>Senior Administrative Officer preparation, study materials, PYQs and mock tests.</p><a href="<?php echo esc_url(ctpwa_url('senior-administrative-officer-grade-ii-in-defence-research-development-organization-drdo/')); ?>">Explore DRDO SAO &rarr;</a></section></div><?php ctpwa_exam_hubs(); ?><h2>Explore &amp; learn</h2><div class="grid"><?php ctpwa_tile('mocktest/','✓','Mock Tests','Practice by exam');ctpwa_tile('current-affairs/','▤','Current Affairs','Daily updates');ctpwa_tile('study-directory/','▥','All Exams & Study Notes','Subjects and exams');ctpwa_tile('previous-years-questions/','≡','Previous Papers','Solved PYQs');ctpwa_tile('vacancies/','◈','Latest Vacancies','Recruitment updates');ctpwa_tile('shop/','▣','Digital Books','Explore the store'); ?></div><h2>Your account</h2><div class="grid"><?php ctpwa_tile('my-account/','◉','My Account','Sign in, orders and downloads');ctpwa_tile('?ct_full_site=1','⌂','Full Website','Open the original website'); ?></div><section id="ctpwa-install-panel" class="install"><b>Keep CrackTarget on your home screen</b><p>Open your study space in one tap.</p><button id="ctpwa-install" type="button" hidden>Install CrackTarget</button><p id="ctpwa-install-note"><small>Android: Chrome menu &rarr; Add to Home screen / Install app. iPhone: Safari Share &rarr; Add to Home Screen.</small></p></section><p><small>Internet is required for learning, sign-in, tests and payments. <a href="<?php echo esc_url(ctpwa_url('privacy-policy/')); ?>">Privacy policy</a>.</small></p></div><nav aria-label="Study app navigation"><?php foreach(array('ct-app/'=>array('⌂','Home'),'mocktest/'=>array('✓','Tests'),'current-affairs/'=>array('▤','Daily CA'),'study-directory/'=>array('▥','Library'),'my-account/'=>array('◉','Account')) as $p=>$v){echo '<a href="'.esc_url(ctpwa_url($p)).'"><span aria-hidden="true">'.ctpwa_svg($v[0]).'</span>'.esc_html($v[1]).'</a>';} ?></nav></main><?php }
 function ctpwa_render(){
   status_header(200);nocache_headers();header('Content-Type: text/html; charset=UTF-8');header('X-Robots-Tag: noindex, follow');
   ?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>CrackTarget | Study App</title><?php ctpwa_head();ctpwa_assets(); ?></head><body style="margin:0"><?php ctpwa_dashboard(); ?></body></html><?php exit;
